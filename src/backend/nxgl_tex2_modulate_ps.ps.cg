@@ -1,0 +1,14 @@
+struct vOut {
+    float4 color : COLOR;
+    float2 tex0  : TEXCOORD0;
+    float2 tex1  : TEXCOORD1;
+};
+
+float4 main(
+    vOut I,
+    uniform sampler2D colorMap0,
+    uniform sampler2D colorMap1
+    ) : COLOR
+{
+    return tex2D(colorMap0, I.tex0.xy) * tex2D(colorMap1, I.tex1.xy) * I.color;
+}

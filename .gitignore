@@ -1,0 +1,14 @@
+*.d
+*.obj
+*.exe
+*.elf
+*.xbe
+*.iso
+*.map
+*.lst
+*.bin
+bin/
+build/
+dist/
+*.inl
+*.inl.*

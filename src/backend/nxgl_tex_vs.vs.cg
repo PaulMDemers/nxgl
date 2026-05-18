@@ -1,0 +1,26 @@
+struct vIn {
+    float4 color    : DIFFUSE;
+    float4 tex      : TEXCOORD;
+    float4 position : POSITION;
+};
+
+struct vOut {
+    float4 color : COLOR;
+    float4 pos   : POSITION;
+    float4 tex0  : TEXCOORD0;
+};
+
+vOut main(
+    vIn I,
+    uniform float4x4 m_mvp
+    )
+{
+    vOut result;
+    float4 pos = mul(float4(I.position.xyz, 1.0f), m_mvp);
+    pos.xyz = pos.xyz / pos.w;
+
+    result.color = I.color;
+    result.pos = pos;
+    result.tex0 = I.tex;
+    return result;
+}

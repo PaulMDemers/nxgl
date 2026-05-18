@@ -1,0 +1,13 @@
+struct vOut {
+    float4 color : COLOR;
+    float2 tex0  : TEXCOORD0;
+};
+
+float4 main(
+    vOut I,
+    uniform sampler2D colorMap
+    ) : COLOR
+{
+    float4 texel = tex2D(colorMap, I.tex0.xy);
+    return float4(saturate(texel.rgb + I.color.rgb), texel.a * I.color.a);
+}
