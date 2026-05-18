@@ -58,6 +58,12 @@ Then include the API from application code:
 - [`docs/RELEASE.md`](docs/RELEASE.md): release checklist.
 - [`docs/opengl_coverage.md`](docs/opengl_coverage.md): compatibility coverage.
 
+For the standard local verification pass on Windows, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1
+```
+
 ## License
 
 NXGL is released under the MIT License. See [`LICENSE`](LICENSE).

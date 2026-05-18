@@ -75,3 +75,14 @@ make -C validation texture
 make -C validation lighting
 make -C validation raster
 ```
+
+For the standard local verification pass from PowerShell, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1
+```
+
+The wrapper finds MSYS2 and the sibling `.nxdk` checkout, then runs the root
+smoke checks, hello-triangle example, autorun suite build, and the focused
+texture/lighting/raster probe groups. It writes a log and JSON summary under
+`dist/verification`, which is ignored.

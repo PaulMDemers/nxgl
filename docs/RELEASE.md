@@ -22,6 +22,13 @@ make clean
 make
 ```
 
+From PowerShell, the standard verification wrapper runs the root smoke checks,
+example build, autorun suite build, and focused probe groups:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1
+```
+
 ## Version Notes
 
 Before tagging, update `CHANGELOG.md` with compatibility changes, known gaps,
