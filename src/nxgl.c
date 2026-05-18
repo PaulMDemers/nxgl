@@ -103,17 +103,17 @@ typedef struct TextureObject {
     TextureLevel levels_1d[NXGL_MAX_TEXTURE_LEVELS];
     TextureLevel levels_3d[NXGL_MAX_TEXTURE_LEVELS];
     TextureLevel cube_faces[6][NXGL_MAX_TEXTURE_LEVELS];
-    N3Texture native;
-    N3Texture native_1d;
-    N3Texture native_3d;
-    N3Texture native_cube;
+    NxglBackendTexture native;
+    NxglBackendTexture native_1d;
+    NxglBackendTexture native_3d;
+    NxglBackendTexture native_cube;
 } TextureObject;
 
 typedef struct LightObject {
     bool enabled;
-    N3Color ambient;
-    N3Color diffuse;
-    N3Color specular;
+    NxglBackendColor ambient;
+    NxglBackendColor diffuse;
+    NxglBackendColor specular;
     GLfloat position[4];
     GLfloat spot_direction[3];
     GLfloat spot_exponent;
@@ -124,10 +124,10 @@ typedef struct LightObject {
 } LightObject;
 
 typedef struct MaterialState {
-    N3Color ambient;
-    N3Color diffuse;
-    N3Color specular;
-    N3Color emission;
+    NxglBackendColor ambient;
+    NxglBackendColor diffuse;
+    NxglBackendColor specular;
+    NxglBackendColor emission;
     GLfloat shininess;
 } MaterialState;
 
@@ -231,8 +231,8 @@ typedef struct DisplayList {
 
 typedef struct AttribSnapshot {
     GLbitfield mask;
-    N3Color current_color;
-    N3Vec3 current_normal;
+    NxglBackendColor current_color;
+    NxglBackendVec3 current_normal;
     GLfloat current_u[4];
     GLfloat current_v[4];
     GLfloat current_r[4];
@@ -267,7 +267,7 @@ typedef struct AttribSnapshot {
     bool light_model_local_viewer;
     bool light_model_two_side;
     GLenum light_model_color_control;
-    N3Color light_model_ambient;
+    NxglBackendColor light_model_ambient;
     bool color_material_enabled;
     GLenum color_material_face;
     GLenum color_material_parameter;
@@ -276,7 +276,7 @@ typedef struct AttribSnapshot {
     bool fog_enabled;
     GLenum fog_mode;
     GLenum fog_hint;
-    N3Color fog_color;
+    NxglBackendColor fog_color;
     GLfloat fog_density;
     GLfloat fog_start;
     GLfloat fog_end;
@@ -347,7 +347,7 @@ typedef struct AttribSnapshot {
     GLuint texture_binding_cube_map[4];
     TexGenState texgen_state[4][4];
     GLenum texture_env_mode[4];
-    N3Color texture_env_color[4];
+    NxglBackendColor texture_env_color[4];
     GLenum texture_combine_rgb[4];
     GLenum texture_combine_alpha[4];
     GLenum texture_source_rgb[4][3];
@@ -400,13 +400,13 @@ static int modelview_stack_top;
 static int projection_stack_top;
 static int texture_stack_top;
 static GLenum matrix_mode = GL_MODELVIEW;
-static N3Color current_color = { 1.0f, 1.0f, 1.0f, 1.0f };
+static NxglBackendColor current_color = { 1.0f, 1.0f, 1.0f, 1.0f };
 static GLfloat current_index;
-static N3Vec3 current_normal = { 0.0f, 0.0f, 1.0f };
+static NxglBackendVec3 current_normal = { 0.0f, 0.0f, 1.0f };
 static float current_u[4];
 static float current_v[4];
 static float current_r[4];
-static N3Vertex pending[1024];
+static NxglBackendVertex pending[1024];
 static int pending_count;
 static GLenum begin_mode = NXGL_NO_BEGIN_MODE;
 static GLfloat point_size = 1.0f;
@@ -452,7 +452,7 @@ static bool lighting_enabled;
 static bool light_model_local_viewer;
 static bool light_model_two_side;
 static GLenum light_model_color_control = GL_SINGLE_COLOR;
-static N3Color light_model_ambient = { 0.2f, 0.2f, 0.2f, 1.0f };
+static NxglBackendColor light_model_ambient = { 0.2f, 0.2f, 0.2f, 1.0f };
 static bool color_material_enabled;
 static bool fog_enabled;
 static bool normalize_enabled;
@@ -477,7 +477,7 @@ static GLuint texture_binding_2d[4];
 static GLuint texture_binding_3d[4];
 static GLuint texture_binding_cube_map[4];
 static GLenum texture_env_mode[4];
-static N3Color texture_env_color[4];
+static NxglBackendColor texture_env_color[4];
 static GLenum texture_combine_rgb[4];
 static GLenum texture_combine_alpha[4];
 static GLenum texture_source_rgb[4][3];
@@ -523,7 +523,7 @@ static GLenum color_material_face = GL_FRONT_AND_BACK;
 static GLenum color_material_parameter = GL_AMBIENT_AND_DIFFUSE;
 static GLenum fog_mode = GL_EXP;
 static GLenum fog_hint = GL_DONT_CARE;
-static N3Color fog_color = { 0.0f, 0.0f, 0.0f, 0.0f };
+static NxglBackendColor fog_color = { 0.0f, 0.0f, 0.0f, 0.0f };
 static GLfloat fog_density = 1.0f;
 static GLfloat fog_start = 0.0f;
 static GLfloat fog_end = 1.0f;
@@ -608,7 +608,7 @@ static int texgen_coord_index(GLenum coord);
 static GLenum texgen_cap_from_index(int index);
 static bool valid_texgen_mode(GLenum coord, GLenum mode);
 static void init_texgen_state(void);
-static void apply_texgen_to_coords(GLfloat obj[4], N3Vec3 eye, N3Vec3 normal, GLfloat *u, GLfloat *v, GLfloat *r, int unit);
+static void apply_texgen_to_coords(GLfloat obj[4], NxglBackendVec3 eye, NxglBackendVec3 normal, GLfloat *u, GLfloat *v, GLfloat *r, int unit);
 static void capture_attrib_snapshot(AttribSnapshot *snapshot, GLbitfield mask);
 static void restore_attrib_snapshot(const AttribSnapshot *snapshot);
 static void capture_client_attrib_snapshot(ClientAttribSnapshot *snapshot, GLbitfield mask);
@@ -623,11 +623,11 @@ static void apply_eval_map2(GLfloat u, GLfloat v);
 static int clip_plane_index(GLenum plane);
 static bool invert_matrix(Matrix out, const Matrix in);
 static void transform_clip_plane(GLdouble out[4], const GLdouble in[4]);
-static bool point_inside_clip_planes(N3Vec3 pos);
-static bool primitive_rejected_by_clip_planes(const N3Vertex *vertices, int count);
-static GLfloat feedback_clip_plane_value(const N3Vertex *vertex, int plane);
-static void normalize_lower_feedback_clip_edges(N3Vertex *vertices, int count);
-static void shadow_fill_bounds(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d, bool quad, bool line);
+static bool point_inside_clip_planes(NxglBackendVec3 pos);
+static bool primitive_rejected_by_clip_planes(const NxglBackendVertex *vertices, int count);
+static GLfloat feedback_clip_plane_value(const NxglBackendVertex *vertex, int plane);
+static void normalize_lower_feedback_clip_edges(NxglBackendVertex *vertices, int count);
+static void shadow_fill_bounds(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d, bool quad, bool line);
 static int mip_chain_end_level(GLsizei width, GLsizei height, GLsizei depth, GLint base_level, GLint max_level);
 static bool texture_levels_complete(const TextureObject *texture, const TextureLevel *levels);
 static TextureLevel *select_texture_level_for_lod(TextureObject *texture, TextureLevel *levels, GLfloat lambda);
@@ -651,12 +651,12 @@ static bool ensure_accum_buffer(void);
 static int get_component_count(GLenum pname);
 static bool valid_pixel_type(GLenum type);
 static bool convert_to_rgba(uint8_t *dst, const uint8_t *src, GLsizei width, GLsizei height, GLenum format, GLenum type);
-static bool shadow_project(N3Vec3 pos, int *sx, int *sy);
+static bool shadow_project(NxglBackendVec3 pos, int *sx, int *sy);
 static size_t pixel_source_data_size(GLsizei width, GLsizei height, GLenum format, GLenum type);
 static size_t bitmap_source_data_size(GLsizei width, GLsizei height);
 static void sync_native_state(void);
 static void ensure_native_frame_started(void);
-static void apply_color_material(N3Color color);
+static void apply_color_material(NxglBackendColor color);
 
 static void set_error(GLenum error)
 {
@@ -1386,8 +1386,8 @@ static void init_texture_object(TextureObject *texture)
 static void init_light_object(LightObject *light, int index)
 {
     light->enabled = false;
-    light->ambient = (N3Color){ 0.0f, 0.0f, 0.0f, 1.0f };
-    light->diffuse = (N3Color){ index == 0 ? 1.0f : 0.0f, index == 0 ? 1.0f : 0.0f, index == 0 ? 1.0f : 0.0f, 1.0f };
+    light->ambient = (NxglBackendColor){ 0.0f, 0.0f, 0.0f, 1.0f };
+    light->diffuse = (NxglBackendColor){ index == 0 ? 1.0f : 0.0f, index == 0 ? 1.0f : 0.0f, index == 0 ? 1.0f : 0.0f, 1.0f };
     light->specular = light->diffuse;
     light->position[0] = 0.0f;
     light->position[1] = 0.0f;
@@ -1495,13 +1495,13 @@ static void destroy_texture_level(TextureObject *texture, GLenum target, int lev
     int face = cube_face_index(target);
 
     if (target == GL_TEXTURE_1D && level == 0) {
-        n3_texture_destroy(&texture->native_1d);
+        nxgl_backend_texture_destroy(&texture->native_1d);
         memset(&texture->native_1d, 0, sizeof(texture->native_1d));
     } else if (target == GL_TEXTURE_2D && level == 0) {
-        n3_texture_destroy(&texture->native);
+        nxgl_backend_texture_destroy(&texture->native);
         memset(&texture->native, 0, sizeof(texture->native));
     } else if (target == GL_TEXTURE_3D && level == 0) {
-        n3_texture_destroy(&texture->native_3d);
+        nxgl_backend_texture_destroy(&texture->native_3d);
         memset(&texture->native_3d, 0, sizeof(texture->native_3d));
     }
     if (target == GL_TEXTURE_1D) {
@@ -1517,13 +1517,13 @@ static void destroy_texture_level(TextureObject *texture, GLenum target, int lev
 
 static void destroy_texture_image(TextureObject *texture)
 {
-    n3_texture_destroy(&texture->native);
+    nxgl_backend_texture_destroy(&texture->native);
     memset(&texture->native, 0, sizeof(texture->native));
-    n3_texture_destroy(&texture->native_1d);
+    nxgl_backend_texture_destroy(&texture->native_1d);
     memset(&texture->native_1d, 0, sizeof(texture->native_1d));
-    n3_texture_destroy(&texture->native_3d);
+    nxgl_backend_texture_destroy(&texture->native_3d);
     memset(&texture->native_3d, 0, sizeof(texture->native_3d));
-    n3_texture_destroy(&texture->native_cube);
+    nxgl_backend_texture_destroy(&texture->native_cube);
     memset(&texture->native_cube, 0, sizeof(texture->native_cube));
     for (int level = 0; level < NXGL_MAX_TEXTURE_LEVELS; ++level) {
         destroy_texture_level_image(&texture->levels[level]);
@@ -1738,7 +1738,7 @@ static bool rebuild_native_cube_texture(TextureObject *texture)
     const uint8_t *faces[6];
     GLint level;
 
-    n3_texture_destroy(&texture->native_cube);
+    nxgl_backend_texture_destroy(&texture->native_cube);
     memset(&texture->native_cube, 0, sizeof(texture->native_cube));
     level = select_cube_level_for_lod(texture, 0.0f);
     if (level < 0) {
@@ -1748,19 +1748,19 @@ static bool rebuild_native_cube_texture(TextureObject *texture)
     for (int face = 0; face < 6; ++face) {
         faces[face] = texture->cube_faces[face][level].rgba;
     }
-    return n3_texture_create_cube_rgba(&texture->native_cube, (uint16_t)texture->cube_faces[0][level].width, faces) == 0;
+    return nxgl_backend_texture_create_cube_rgba(&texture->native_cube, (uint16_t)texture->cube_faces[0][level].width, faces) == 0;
 }
 
-static N3CompressedTextureFormat native_compressed_format(GLenum format)
+static NxglBackendCompressedTextureFormat native_compressed_format(GLenum format)
 {
     if (format == GL_COMPRESSED_RGB_S3TC_DXT1_EXT ||
         format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) {
-        return N3_COMPRESSED_DXT1;
+        return NXGL_BACKEND_COMPRESSED_DXT1;
     }
     if (format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) {
-        return N3_COMPRESSED_DXT3;
+        return NXGL_BACKEND_COMPRESSED_DXT3;
     }
-    return N3_COMPRESSED_DXT5;
+    return NXGL_BACKEND_COMPRESSED_DXT5;
 }
 
 static bool rebuild_native_texture2d(TextureObject *texture)
@@ -1770,7 +1770,7 @@ static bool rebuild_native_texture2d(TextureObject *texture)
     if (texture == NULL) {
         return true;
     }
-    n3_texture_destroy(&texture->native);
+    nxgl_backend_texture_destroy(&texture->native);
     memset(&texture->native, 0, sizeof(texture->native));
 
     image = select_texture_level_for_lod(texture, texture->levels, 0.0f);
@@ -1781,7 +1781,7 @@ static bool rebuild_native_texture2d(TextureObject *texture)
         if (image->compressed_data == NULL || image->compressed_size <= 0) {
             return true;
         }
-        return n3_texture_create_compressed(&texture->native,
+        return nxgl_backend_texture_create_compressed(&texture->native,
                                             (uint16_t)image->width,
                                             (uint16_t)image->height,
                                             native_compressed_format((GLenum)image->internal_format),
@@ -1791,7 +1791,7 @@ static bool rebuild_native_texture2d(TextureObject *texture)
     if (image->rgba == NULL) {
         return true;
     }
-    return n3_texture_create_rgba(&texture->native, (uint16_t)image->width, (uint16_t)image->height, image->rgba) == 0;
+    return nxgl_backend_texture_create_rgba(&texture->native, (uint16_t)image->width, (uint16_t)image->height, image->rgba) == 0;
 }
 
 static bool rebuild_native_compressed_texture(TextureObject *texture)
@@ -1806,7 +1806,7 @@ static bool rebuild_native_texture1d(TextureObject *texture)
     if (texture == NULL) {
         return true;
     }
-    n3_texture_destroy(&texture->native_1d);
+    nxgl_backend_texture_destroy(&texture->native_1d);
     memset(&texture->native_1d, 0, sizeof(texture->native_1d));
     if (texture->base_level != 0 || is_mipmap_filter(texture->min_filter)) {
         return true;
@@ -1815,7 +1815,7 @@ static bool rebuild_native_texture1d(TextureObject *texture)
     if (image == NULL || !image->defined || image->compressed || image->rgba == NULL) {
         return true;
     }
-    return n3_texture_create_rgba(&texture->native_1d, (uint16_t)image->width, 1, image->rgba) == 0;
+    return nxgl_backend_texture_create_rgba(&texture->native_1d, (uint16_t)image->width, 1, image->rgba) == 0;
 }
 
 static bool rebuild_native_texture3d(TextureObject *texture)
@@ -1825,13 +1825,13 @@ static bool rebuild_native_texture3d(TextureObject *texture)
     if (texture == NULL) {
         return true;
     }
-    n3_texture_destroy(&texture->native_3d);
+    nxgl_backend_texture_destroy(&texture->native_3d);
     memset(&texture->native_3d, 0, sizeof(texture->native_3d));
     image = select_texture_level_for_lod(texture, texture->levels_3d, 0.0f);
     if (image == NULL || !image->defined || image->compressed || image->rgba == NULL) {
         return true;
     }
-    return n3_texture_create_rgba3d(&texture->native_3d,
+    return nxgl_backend_texture_create_rgba3d(&texture->native_3d,
                                     (uint16_t)image->width,
                                     (uint16_t)image->height,
                                     (uint16_t)image->depth,
@@ -2182,7 +2182,7 @@ static bool copy_shadow_rgba(uint8_t *dst, GLint x, GLint y, GLsizei width, GLsi
         return false;
     }
 
-    n3_flush();
+    nxgl_backend_flush();
     for (GLsizei row = 0; row < height; ++row) {
         int src_y = shadow_height - 1 - (y + row);
         const uint32_t *src_row = shadow_color_buffer + (size_t)src_y * (size_t)shadow_width + (size_t)x;
@@ -2279,7 +2279,7 @@ static GLfloat map_depth_range(GLfloat normalized)
     return clamp01(depth_range_near + (depth_range_far - depth_range_near) * clamped);
 }
 
-static GLfloat eye_depth_normalized(N3Vec3 pos)
+static GLfloat eye_depth_normalized(NxglBackendVec3 pos)
 {
     return clamp01((-(pos.z + camera_z)) / 100.0f);
 }
@@ -2302,11 +2302,11 @@ static void viewport_top_left_bounds(int *min_x, int *min_y, int *max_x, int *ma
     *max_y = y2;
 }
 
-static N3Vec3 normalize_vec3(N3Vec3 v)
+static NxglBackendVec3 normalize_vec3(NxglBackendVec3 v)
 {
     float len = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
     if (len < 0.00001f) {
-        N3Vec3 fallback = { 0.0f, 0.0f, 1.0f };
+        NxglBackendVec3 fallback = { 0.0f, 0.0f, 1.0f };
         return fallback;
     }
     v.x /= len;
@@ -2315,7 +2315,7 @@ static N3Vec3 normalize_vec3(N3Vec3 v)
     return v;
 }
 
-static void apply_texgen_to_coords(GLfloat obj[4], N3Vec3 eye, N3Vec3 normal, GLfloat *u, GLfloat *v, GLfloat *r, int unit)
+static void apply_texgen_to_coords(GLfloat obj[4], NxglBackendVec3 eye, NxglBackendVec3 normal, GLfloat *u, GLfloat *v, GLfloat *r, int unit)
 {
     GLfloat generated[4] = { *u, *v, *r, 1.0f };
     GLfloat eye_vec[4] = { eye.x, eye.y, eye.z, 1.0f };
@@ -2341,7 +2341,7 @@ static void apply_texgen_to_coords(GLfloat obj[4], N3Vec3 eye, N3Vec3 normal, GL
                     eye_vec[2] * state->eye_plane[2] +
                     eye_vec[3] * state->eye_plane[3];
         } else if (state->mode == GL_SPHERE_MAP && coord < 2) {
-            N3Vec3 n = normalize_vec3(normal);
+            NxglBackendVec3 n = normalize_vec3(normal);
             value = coord == 0 ? n.x * 0.5f + 0.5f : n.y * 0.5f + 0.5f;
         }
         generated[coord] = value;
@@ -2357,41 +2357,41 @@ static void apply_texgen_to_coords(GLfloat obj[4], N3Vec3 eye, N3Vec3 normal, GL
     }
 }
 
-static float dot_vec3(N3Vec3 a, N3Vec3 b)
+static float dot_vec3(NxglBackendVec3 a, NxglBackendVec3 b)
 {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-static N3Vec3 subtract_vec3(N3Vec3 a, N3Vec3 b)
+static NxglBackendVec3 subtract_vec3(NxglBackendVec3 a, NxglBackendVec3 b)
 {
-    N3Vec3 out = { a.x - b.x, a.y - b.y, a.z - b.z };
+    NxglBackendVec3 out = { a.x - b.x, a.y - b.y, a.z - b.z };
     return out;
 }
 
-static float length_vec3(N3Vec3 v)
+static float length_vec3(NxglBackendVec3 v)
 {
     return sqrtf(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-static N3Color multiply_color(N3Color a, N3Color b)
+static NxglBackendColor multiply_color(NxglBackendColor a, NxglBackendColor b)
 {
-    N3Color out = { a.r * b.r, a.g * b.g, a.b * b.b, a.a * b.a };
+    NxglBackendColor out = { a.r * b.r, a.g * b.g, a.b * b.b, a.a * b.a };
     return out;
 }
 
-static N3Color add_color(N3Color a, N3Color b)
+static NxglBackendColor add_color(NxglBackendColor a, NxglBackendColor b)
 {
-    N3Color out = { a.r + b.r, a.g + b.g, a.b + b.b, a.a };
+    NxglBackendColor out = { a.r + b.r, a.g + b.g, a.b + b.b, a.a };
     return out;
 }
 
-static N3Color scale_color(N3Color color, float scale)
+static NxglBackendColor scale_color(NxglBackendColor color, float scale)
 {
-    N3Color out = { color.r * scale, color.g * scale, color.b * scale, color.a };
+    NxglBackendColor out = { color.r * scale, color.g * scale, color.b * scale, color.a };
     return out;
 }
 
-static N3Color clamp_color(N3Color color)
+static NxglBackendColor clamp_color(NxglBackendColor color)
 {
     color.r = clamp01(color.r);
     color.g = clamp01(color.g);
@@ -2400,7 +2400,7 @@ static N3Color clamp_color(N3Color color)
     return color;
 }
 
-static void apply_color_material(N3Color color)
+static void apply_color_material(NxglBackendColor color)
 {
     if (!color_material_enabled) {
         return;
@@ -2439,10 +2439,10 @@ static void apply_color_material(N3Color color)
     }
 }
 
-static N3Color lit_color_with_material(N3Color base_color, N3Vec3 normal, N3Vec3 eye, const MaterialState *material)
+static NxglBackendColor lit_color_with_material(NxglBackendColor base_color, NxglBackendVec3 normal, NxglBackendVec3 eye, const MaterialState *material)
 {
-    N3Color result;
-    N3Color specular_accum = { 0.0f, 0.0f, 0.0f, 0.0f };
+    NxglBackendColor result;
+    NxglBackendColor specular_accum = { 0.0f, 0.0f, 0.0f, 0.0f };
     bool any_light = false;
 
     if (!lighting_enabled) {
@@ -2463,10 +2463,10 @@ static N3Color lit_color_with_material(N3Color base_color, N3Vec3 normal, N3Vec3
         }
         any_light = true;
         float light_scale = 1.0f;
-        N3Vec3 light_dir = { lights[i].position[0], lights[i].position[1], lights[i].position[2] };
+        NxglBackendVec3 light_dir = { lights[i].position[0], lights[i].position[1], lights[i].position[2] };
         if (lights[i].position[3] != 0.0f) {
-            N3Vec3 light_pos = light_dir;
-            N3Vec3 to_vertex = subtract_vec3(eye, light_pos);
+            NxglBackendVec3 light_pos = light_dir;
+            NxglBackendVec3 to_vertex = subtract_vec3(eye, light_pos);
             float distance = length_vec3(to_vertex);
             float attenuation = lights[i].constant_attenuation +
                                 lights[i].linear_attenuation * distance +
@@ -2476,7 +2476,7 @@ static N3Color lit_color_with_material(N3Color base_color, N3Vec3 normal, N3Vec3
                 light_scale = 1.0f / attenuation;
             }
             if (lights[i].spot_cutoff != 180.0f) {
-                N3Vec3 spot_dir = normalize_vec3((N3Vec3){
+                NxglBackendVec3 spot_dir = normalize_vec3((NxglBackendVec3){
                     lights[i].spot_direction[0],
                     lights[i].spot_direction[1],
                     lights[i].spot_direction[2]
@@ -2498,14 +2498,14 @@ static N3Color lit_color_with_material(N3Color base_color, N3Vec3 normal, N3Vec3
         result = add_color(result, scale_color(multiply_color(material->ambient, lights[i].ambient), light_scale));
         result = add_color(result, scale_color(multiply_color(material->diffuse, lights[i].diffuse), diffuse * light_scale));
         if (material->shininess > 0.0f && diffuse > 0.0f) {
-            N3Vec3 view_dir = light_model_local_viewer ? normalize_vec3((N3Vec3){ -eye.x, -eye.y, -eye.z }) : (N3Vec3){ 0.0f, 0.0f, 1.0f };
-            N3Vec3 half_vec = normalize_vec3((N3Vec3){ light_dir.x + view_dir.x, light_dir.y + view_dir.y, light_dir.z + view_dir.z });
+            NxglBackendVec3 view_dir = light_model_local_viewer ? normalize_vec3((NxglBackendVec3){ -eye.x, -eye.y, -eye.z }) : (NxglBackendVec3){ 0.0f, 0.0f, 1.0f };
+            NxglBackendVec3 half_vec = normalize_vec3((NxglBackendVec3){ light_dir.x + view_dir.x, light_dir.y + view_dir.y, light_dir.z + view_dir.z });
             float spec_angle = dot_vec3(normal, half_vec);
             float spec = 0.0f;
             if (spec_angle > 0.0f) {
                 spec = powf(spec_angle, material->shininess * 0.25f) * light_scale;
             }
-            N3Color contribution = scale_color(multiply_color(material->specular, lights[i].specular), spec);
+            NxglBackendColor contribution = scale_color(multiply_color(material->specular, lights[i].specular), spec);
             if (light_model_color_control == GL_SEPARATE_SPECULAR_COLOR) {
                 specular_accum = add_color(specular_accum, contribution);
             } else {
@@ -2525,7 +2525,7 @@ static N3Color lit_color_with_material(N3Color base_color, N3Vec3 normal, N3Vec3
     return clamp_color(result);
 }
 
-static N3Color lit_color(N3Color base_color, N3Vec3 normal, N3Vec3 eye)
+static NxglBackendColor lit_color(NxglBackendColor base_color, NxglBackendVec3 normal, NxglBackendVec3 eye)
 {
     return lit_color_with_material(base_color, normal, eye, &material_state);
 }
@@ -2556,10 +2556,10 @@ static float fog_factor(float depth)
     return clamp01(factor);
 }
 
-static N3Color apply_fog(N3Color color, N3Vec3 pos)
+static NxglBackendColor apply_fog(NxglBackendColor color, NxglBackendVec3 pos)
 {
     float factor;
-    N3Color out;
+    NxglBackendColor out;
 
     if (!fog_enabled) {
         return color;
@@ -2772,7 +2772,7 @@ static void transform_clip_plane(GLdouble out[4], const GLdouble in[4])
     out[3] = in[0] * inverse[M41] + in[1] * inverse[M42] + in[2] * inverse[M43] + in[3] * inverse[M44];
 }
 
-static bool point_inside_clip_planes(N3Vec3 pos)
+static bool point_inside_clip_planes(NxglBackendVec3 pos)
 {
     for (int i = 0; i < NXGL_MAX_CLIP_PLANES; ++i) {
         const GLdouble *p = clip_planes[i].equation;
@@ -2789,7 +2789,7 @@ static bool point_inside_clip_planes(N3Vec3 pos)
     return true;
 }
 
-static bool primitive_rejected_by_clip_planes(const N3Vertex *vertices, int count)
+static bool primitive_rejected_by_clip_planes(const NxglBackendVertex *vertices, int count)
 {
     if (vertices == NULL || count <= 0) {
         return true;
@@ -2829,40 +2829,40 @@ static bool default_combine_sources(int unit)
            texture_rgb_scale[unit] == 1.0f;
 }
 
-static N3TextureEnvMode native_texture_env_mode_for_unit(int unit)
+static NxglBackendTextureEnvMode native_texture_env_mode_for_unit(int unit)
 {
     GLenum mode = texture_env_mode[unit];
 
     if (mode == GL_COMBINE && default_combine_sources(unit)) {
         switch (texture_combine_rgb[unit]) {
         case GL_REPLACE:
-            return N3_TEXENV_REPLACE;
+            return NXGL_BACKEND_TEXENV_REPLACE;
         case GL_ADD:
-            return N3_TEXENV_ADD;
+            return NXGL_BACKEND_TEXENV_ADD;
         case GL_ADD_SIGNED:
-            return N3_TEXENV_ADD_SIGNED;
+            return NXGL_BACKEND_TEXENV_ADD_SIGNED;
         case GL_SUBTRACT:
-            return N3_TEXENV_SUBTRACT;
+            return NXGL_BACKEND_TEXENV_SUBTRACT;
         case GL_INTERPOLATE:
-            return N3_TEXENV_INTERPOLATE;
+            return NXGL_BACKEND_TEXENV_INTERPOLATE;
         case GL_MODULATE:
         default:
-            return N3_TEXENV_MODULATE;
+            return NXGL_BACKEND_TEXENV_MODULATE;
         }
     }
 
     switch (mode) {
     case GL_REPLACE:
-        return N3_TEXENV_REPLACE;
+        return NXGL_BACKEND_TEXENV_REPLACE;
     case GL_DECAL:
-        return N3_TEXENV_DECAL;
+        return NXGL_BACKEND_TEXENV_DECAL;
     case GL_BLEND:
-        return N3_TEXENV_BLEND;
+        return NXGL_BACKEND_TEXENV_BLEND;
     case GL_ADD:
-        return N3_TEXENV_ADD;
+        return NXGL_BACKEND_TEXENV_ADD;
     case GL_MODULATE:
     default:
-        return N3_TEXENV_MODULATE;
+        return NXGL_BACKEND_TEXENV_MODULATE;
     }
 }
 
@@ -2872,12 +2872,12 @@ static void sync_native_state(void)
     TextureObject *texture1d0 = NULL;
     TextureObject *texture1 = NULL;
     TextureObject *texture1d1 = NULL;
-    n3_set_depth(depth_test_enabled, depth_write_enabled);
-    n3_set_cull(cull_enabled);
-    n3_set_cull_mode(cull_face_mode, front_face_mode);
-    n3_set_blend_func(blend_sfactor, blend_dfactor);
-    n3_set_scissor(scissor_test_enabled, scissor_box[0], shadow_height - (scissor_box[1] + scissor_box[3]), scissor_box[2], scissor_box[3]);
-    n3_set_texture_env(native_texture_env_mode_for_unit(0), texture_env_color[0]);
+    nxgl_backend_set_depth(depth_test_enabled, depth_write_enabled);
+    nxgl_backend_set_cull(cull_enabled);
+    nxgl_backend_set_cull_mode(cull_face_mode, front_face_mode);
+    nxgl_backend_set_blend_func(blend_sfactor, blend_dfactor);
+    nxgl_backend_set_scissor(scissor_test_enabled, scissor_box[0], shadow_height - (scissor_box[1] + scissor_box[3]), scissor_box[2], scissor_box[3]);
+    nxgl_backend_set_texture_env(native_texture_env_mode_for_unit(0), texture_env_color[0]);
     if (texture_2d_enabled[0] &&
         texture_binding_2d[0] > 0 &&
         texture_binding_2d[0] < 16 &&
@@ -2910,33 +2910,33 @@ static void sync_native_state(void)
     if (texture0 != NULL &&
         texture0->native.addr != NULL &&
         texture_complete(texture0)) {
-        n3_bind_texture(&texture0->native);
+        nxgl_backend_bind_texture(&texture0->native);
     } else if (texture1d0 != NULL &&
         texture1d0->base_level == 0 &&
         texture1d0->native_1d.addr != NULL &&
         texture_1d_complete(texture1d0)) {
-        n3_bind_texture(&texture1d0->native_1d);
+        nxgl_backend_bind_texture(&texture1d0->native_1d);
     } else {
-        n3_bind_texture(NULL);
+        nxgl_backend_bind_texture(NULL);
     }
     if (texture1 != NULL &&
         texture1->native.addr != NULL &&
         texture_complete(texture1)) {
-        n3_bind_texture1(&texture1->native);
+        nxgl_backend_bind_texture1(&texture1->native);
     } else if (texture1d1 != NULL &&
         texture1d1->base_level == 0 &&
         texture1d1->native_1d.addr != NULL &&
         texture_1d_complete(texture1d1)) {
-        n3_bind_texture1(&texture1d1->native_1d);
+        nxgl_backend_bind_texture1(&texture1d1->native_1d);
     } else {
-        n3_bind_texture1(NULL);
+        nxgl_backend_bind_texture1(NULL);
     }
 }
 
 static void ensure_native_frame_started(void)
 {
     if (!native_frame_started) {
-        n3_begin_frame(blend_enabled);
+        nxgl_backend_begin_frame(blend_enabled);
         native_frame_started = true;
         sync_native_state();
     }
@@ -2968,7 +2968,7 @@ static bool projected_path_active(void)
     return !projection_is_identity();
 }
 
-static void update_projected_position_from_clip(N3Vertex *vertex)
+static void update_projected_position_from_clip(NxglBackendVertex *vertex)
 {
     GLfloat inv_w;
     GLfloat ndc_x;
@@ -2990,19 +2990,19 @@ static void update_projected_position_from_clip(N3Vertex *vertex)
     vertex->window_z = map_depth_range(clamp01(ndc_z * 0.5f + 0.5f));
 }
 
-static N3Vec3 transform_vertex(float x, float y, float z)
+static NxglBackendVec3 transform_vertex(float x, float y, float z)
 {
-    N3Vec3 out;
+    NxglBackendVec3 out;
     out.x = x * modelview[M11] + y * modelview[M21] + z * modelview[M31] + modelview[M41];
     out.y = x * modelview[M12] + y * modelview[M22] + z * modelview[M32] + modelview[M42];
     out.z = x * modelview[M13] + y * modelview[M23] + z * modelview[M33] + modelview[M43];
     return out;
 }
 
-static N3Vec3 transform_normal_to_eye(N3Vec3 normal)
+static NxglBackendVec3 transform_normal_to_eye(NxglBackendVec3 normal)
 {
     Matrix inverse;
-    N3Vec3 out;
+    NxglBackendVec3 out;
 
     if (!invert_matrix(inverse, modelview)) {
         out.x = normal.x * modelview[M11] + normal.y * modelview[M21] + normal.z * modelview[M31];
@@ -3011,13 +3011,13 @@ static N3Vec3 transform_normal_to_eye(N3Vec3 normal)
         return out;
     }
 
-    out.x = normal.x * inverse[M11] + normal.y * inverse[M12] + normal.z * inverse[M13];
-    out.y = normal.x * inverse[M21] + normal.y * inverse[M22] + normal.z * inverse[M23];
-    out.z = normal.x * inverse[M31] + normal.y * inverse[M32] + normal.z * inverse[M33];
+    out.x = normal.x * inverse[M11] + normal.y * inverse[M21] + normal.z * inverse[M31];
+    out.y = normal.x * inverse[M12] + normal.y * inverse[M22] + normal.z * inverse[M32];
+    out.z = normal.x * inverse[M13] + normal.y * inverse[M23] + normal.z * inverse[M33];
     return out;
 }
 
-static void init_vertex_position(N3Vertex *out, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
+static void init_vertex_position(NxglBackendVertex *out, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
     GLfloat eye[4];
     GLfloat clip[4];
@@ -3026,7 +3026,7 @@ static void init_vertex_position(N3Vertex *out, GLfloat x, GLfloat y, GLfloat z,
         w = 1.0f;
     }
     transform_point4(modelview, x, y, z, w, eye);
-    out->eye = (N3Vec3){ eye[0], eye[1], eye[2] };
+    out->eye = (NxglBackendVec3){ eye[0], eye[1], eye[2] };
     transform_point4(projection, eye[0], eye[1], eye[2], eye[3], clip);
     out->clip_x = clip[0];
     out->clip_y = clip[1];
@@ -3042,9 +3042,9 @@ static void init_vertex_position(N3Vertex *out, GLfloat x, GLfloat y, GLfloat z,
     update_projected_position_from_clip(out);
 }
 
-static N3Vec3 read_array_normal(GLint index)
+static NxglBackendVec3 read_array_normal(GLint index)
 {
-    N3Vec3 normal = current_normal;
+    NxglBackendVec3 normal = current_normal;
     const uint8_t *base;
     int component_size;
     GLsizei stride;
@@ -3060,10 +3060,10 @@ static N3Vec3 read_array_normal(GLint index)
     return normalize_vec3(normal);
 }
 
-static N3Vertex read_array_vertex(GLint index)
+static NxglBackendVertex read_array_vertex(GLint index)
 {
-    N3Vertex out;
-    N3Vec3 normal;
+    NxglBackendVertex out;
+    NxglBackendVec3 normal;
     GLfloat obj[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
     const uint8_t *base;
     int component_size;
@@ -3153,7 +3153,7 @@ static N3Vertex read_array_vertex(GLint index)
     return out;
 }
 
-static bool primitive_intersects_viewport(const N3Vertex *vertices, int count)
+static bool primitive_intersects_viewport(const NxglBackendVertex *vertices, int count)
 {
     int min_x;
     int max_x;
@@ -3203,9 +3203,9 @@ static bool primitive_intersects_viewport(const N3Vertex *vertices, int count)
            min_y <= viewport_max_y;
 }
 
-static N3Vertex interpolate_vertex(const N3Vertex *a, const N3Vertex *b, GLfloat t)
+static NxglBackendVertex interpolate_vertex(const NxglBackendVertex *a, const NxglBackendVertex *b, GLfloat t)
 {
-    N3Vertex out;
+    NxglBackendVertex out;
 
     out.pos.x = a->pos.x + (b->pos.x - a->pos.x) * t;
     out.pos.y = a->pos.y + (b->pos.y - a->pos.y) * t;
@@ -3270,7 +3270,7 @@ static bool clip_line_interval(GLfloat f0, GLfloat f1, GLfloat *t0, GLfloat *t1)
     return *t0 <= *t1;
 }
 
-static bool clip_line_to_feedback_volume(const N3Vertex *in_a, const N3Vertex *in_b, N3Vertex *out_a, N3Vertex *out_b)
+static bool clip_line_to_feedback_volume(const NxglBackendVertex *in_a, const NxglBackendVertex *in_b, NxglBackendVertex *out_a, NxglBackendVertex *out_b)
 {
     GLfloat t0 = 0.0f;
     GLfloat t1 = 1.0f;
@@ -3322,7 +3322,7 @@ static bool clip_line_to_feedback_volume(const N3Vertex *in_a, const N3Vertex *i
         return false;
     }
     {
-        N3Vertex clipped[2];
+        NxglBackendVertex clipped[2];
         clipped[0] = interpolate_vertex(in_a, in_b, t0);
         clipped[1] = interpolate_vertex(in_a, in_b, t1);
         normalize_lower_feedback_clip_edges(clipped, 2);
@@ -3332,7 +3332,7 @@ static bool clip_line_to_feedback_volume(const N3Vertex *in_a, const N3Vertex *i
     return true;
 }
 
-static void normalize_lower_feedback_clip_edge(N3Vertex *vertex)
+static void normalize_lower_feedback_clip_edge(NxglBackendVertex *vertex)
 {
     GLfloat z;
     GLfloat y;
@@ -3349,7 +3349,7 @@ static void normalize_lower_feedback_clip_edge(N3Vertex *vertex)
     }
 }
 
-static void normalize_lower_feedback_clip_edges(N3Vertex *vertices, int count)
+static void normalize_lower_feedback_clip_edges(NxglBackendVertex *vertices, int count)
 {
     bool touches_upper = false;
 
@@ -3374,7 +3374,7 @@ static void normalize_lower_feedback_clip_edges(N3Vertex *vertices, int count)
     }
 }
 
-static GLfloat feedback_clip_plane_value(const N3Vertex *vertex, int plane)
+static GLfloat feedback_clip_plane_value(const NxglBackendVertex *vertex, int plane)
 {
     if (projected_path_active()) {
         switch (plane) {
@@ -3421,9 +3421,9 @@ static GLfloat feedback_clip_plane_value(const N3Vertex *vertex, int plane)
     }
 }
 
-static bool clip_polygon_against_feedback_plane(const N3Vertex *input, int input_count, N3Vertex *output, int *output_count, int plane)
+static bool clip_polygon_against_feedback_plane(const NxglBackendVertex *input, int input_count, NxglBackendVertex *output, int *output_count, int plane)
 {
-    N3Vertex previous;
+    NxglBackendVertex previous;
     GLfloat previous_value;
     bool previous_inside;
     int out_count = 0;
@@ -3438,7 +3438,7 @@ static bool clip_polygon_against_feedback_plane(const N3Vertex *input, int input
     previous_inside = previous_value >= 0.0f;
 
     for (int i = 0; i < input_count; ++i) {
-        N3Vertex current = input[i];
+        NxglBackendVertex current = input[i];
         GLfloat current_value = feedback_clip_plane_value(&current, plane);
         bool current_inside = current_value >= 0.0f;
 
@@ -3468,12 +3468,12 @@ static bool clip_polygon_against_feedback_plane(const N3Vertex *input, int input
     return out_count >= 3;
 }
 
-static bool clip_polygon_to_feedback_volume(const N3Vertex *vertices, int count, N3Vertex *output, int *output_count)
+static bool clip_polygon_to_feedback_volume(const NxglBackendVertex *vertices, int count, NxglBackendVertex *output, int *output_count)
 {
-    N3Vertex scratch_a[NXGL_CLIPPED_POLYGON_MAX];
-    N3Vertex scratch_b[NXGL_CLIPPED_POLYGON_MAX];
-    N3Vertex *in = scratch_a;
-    N3Vertex *out = scratch_b;
+    NxglBackendVertex scratch_a[NXGL_CLIPPED_POLYGON_MAX];
+    NxglBackendVertex scratch_b[NXGL_CLIPPED_POLYGON_MAX];
+    NxglBackendVertex *in = scratch_a;
+    NxglBackendVertex *out = scratch_b;
     int in_count = count;
     int out_count = 0;
 
@@ -3482,14 +3482,14 @@ static bool clip_polygon_to_feedback_volume(const N3Vertex *vertices, int count,
         return false;
     }
 
-    memcpy(scratch_a, vertices, (size_t)count * sizeof(N3Vertex));
+    memcpy(scratch_a, vertices, (size_t)count * sizeof(NxglBackendVertex));
     int fixed_plane_count = projected_path_active() ? 6 : 5;
     for (int plane = 0; plane < fixed_plane_count; ++plane) {
         if (!clip_polygon_against_feedback_plane(in, in_count, out, &out_count, plane)) {
             *output_count = 0;
             return false;
         }
-        N3Vertex *tmp = in;
+        NxglBackendVertex *tmp = in;
         in = out;
         out = tmp;
         in_count = out_count;
@@ -3503,29 +3503,29 @@ static bool clip_polygon_to_feedback_volume(const N3Vertex *vertices, int count,
             *output_count = 0;
             return false;
         }
-        N3Vertex *tmp = in;
+        NxglBackendVertex *tmp = in;
         in = out;
         out = tmp;
         in_count = out_count;
     }
 
-    memcpy(output, in, (size_t)in_count * sizeof(N3Vertex));
+    memcpy(output, in, (size_t)in_count * sizeof(NxglBackendVertex));
     *output_count = in_count;
     normalize_lower_feedback_clip_edges(output, in_count);
     return in_count >= 3;
 }
 
-static GLuint selection_depth_value(const N3Vertex *vertex)
+static GLuint selection_depth_value(const NxglBackendVertex *vertex)
 {
     float normalized = projected_path_active() ? vertex->window_z : map_depth_range(eye_depth_normalized(vertex->pos));
     return (GLuint)(normalized * 4294967295.0f);
 }
 
-static void record_selection_hit(const N3Vertex *vertices, int count)
+static void record_selection_hit(const NxglBackendVertex *vertices, int count)
 {
-    N3Vertex clipped[2];
-    N3Vertex clipped_polygon[NXGL_CLIPPED_POLYGON_MAX];
-    const N3Vertex *depth_vertices = vertices;
+    NxglBackendVertex clipped[2];
+    NxglBackendVertex clipped_polygon[NXGL_CLIPPED_POLYGON_MAX];
+    const NxglBackendVertex *depth_vertices = vertices;
     int depth_count = count;
     GLuint min_z;
     GLuint max_z;
@@ -3593,7 +3593,7 @@ static void feedback_write(GLfloat value)
     feedback_buffer[feedback_write_count++] = value;
 }
 
-static bool project_depth_for_window(N3Vec3 pos, GLfloat *z_out)
+static bool project_depth_for_window(NxglBackendVec3 pos, GLfloat *z_out)
 {
     GLfloat z = -(pos.z + camera_z);
 
@@ -3619,7 +3619,7 @@ static void snap_feedback_viewport_edges(GLfloat *x)
     }
 }
 
-static bool feedback_project_window(N3Vec3 pos, GLfloat *sx, GLfloat *sy)
+static bool feedback_project_window(NxglBackendVec3 pos, GLfloat *sx, GLfloat *sy)
 {
     GLfloat z;
 
@@ -3632,7 +3632,7 @@ static bool feedback_project_window(N3Vec3 pos, GLfloat *sx, GLfloat *sy)
     return true;
 }
 
-static void feedback_write_vertex(const N3Vertex *vertex)
+static void feedback_write_vertex(const NxglBackendVertex *vertex)
 {
     GLfloat x = vertex->pos.x;
     GLfloat y = vertex->pos.y;
@@ -3697,7 +3697,7 @@ static void feedback_write_raster_vertex(void)
     feedback_write(1.0f);
 }
 
-static void record_feedback_point(const N3Vertex *vertex)
+static void record_feedback_point(const NxglBackendVertex *vertex)
 {
     if (render_mode != GL_FEEDBACK) {
         return;
@@ -3709,10 +3709,10 @@ static void record_feedback_point(const N3Vertex *vertex)
     feedback_write_vertex(vertex);
 }
 
-static void record_feedback_line(const N3Vertex *a, const N3Vertex *b)
+static void record_feedback_line(const NxglBackendVertex *a, const NxglBackendVertex *b)
 {
-    N3Vertex clipped_a;
-    N3Vertex clipped_b;
+    NxglBackendVertex clipped_a;
+    NxglBackendVertex clipped_b;
 
     if (render_mode != GL_FEEDBACK) {
         return;
@@ -3725,9 +3725,9 @@ static void record_feedback_line(const N3Vertex *a, const N3Vertex *b)
     feedback_write_vertex(&clipped_b);
 }
 
-static void rotate_feedback_polygon_near_first(N3Vertex *vertices, int count)
+static void rotate_feedback_polygon_near_first(NxglBackendVertex *vertices, int count)
 {
-    N3Vertex scratch[NXGL_CLIPPED_POLYGON_MAX];
+    NxglBackendVertex scratch[NXGL_CLIPPED_POLYGON_MAX];
     int best = -1;
     GLfloat best_z = 1.0f;
 
@@ -3746,13 +3746,13 @@ static void rotate_feedback_polygon_near_first(N3Vertex *vertices, int count)
         return;
     }
 
-    memcpy(scratch, vertices, (size_t)count * sizeof(N3Vertex));
+    memcpy(scratch, vertices, (size_t)count * sizeof(NxglBackendVertex));
     for (int i = 0; i < count; ++i) {
         vertices[i] = scratch[(best + i) % count];
     }
 }
 
-static void trim_feedback_polygon_near_quad(N3Vertex *vertices, int *count)
+static void trim_feedback_polygon_near_quad(NxglBackendVertex *vertices, int *count)
 {
     if (vertices == NULL || count == NULL || *count <= 4 || projected_path_active()) {
         return;
@@ -3762,9 +3762,9 @@ static void trim_feedback_polygon_near_quad(N3Vertex *vertices, int *count)
     }
 }
 
-static void record_feedback_polygon(const N3Vertex *vertices, GLsizei count)
+static void record_feedback_polygon(const NxglBackendVertex *vertices, GLsizei count)
 {
-    N3Vertex clipped[NXGL_CLIPPED_POLYGON_MAX];
+    NxglBackendVertex clipped[NXGL_CLIPPED_POLYGON_MAX];
     int clipped_count = 0;
 
     if (render_mode != GL_FEEDBACK) {
@@ -3800,7 +3800,7 @@ static void record_feedback_pixel_token(GLenum token)
     feedback_write_raster_vertex();
 }
 
-static bool project_window_for_winding(N3Vec3 pos, GLfloat *sx, GLfloat *sy)
+static bool project_window_for_winding(NxglBackendVec3 pos, GLfloat *sx, GLfloat *sy)
 {
     GLfloat z;
 
@@ -3812,7 +3812,7 @@ static bool project_window_for_winding(N3Vec3 pos, GLfloat *sx, GLfloat *sy)
     return true;
 }
 
-static bool polygon_culled(const N3Vertex *vertices, int count)
+static bool polygon_culled(const NxglBackendVertex *vertices, int count)
 {
     GLfloat xs[NXGL_CLIPPED_POLYGON_MAX];
     GLfloat ys[NXGL_CLIPPED_POLYGON_MAX];
@@ -3844,7 +3844,7 @@ static bool polygon_culled(const N3Vertex *vertices, int count)
     return cull_face_mode == GL_FRONT ? front : !front;
 }
 
-static bool polygon_front_facing(const N3Vertex *vertices, int count)
+static bool polygon_front_facing(const NxglBackendVertex *vertices, int count)
 {
     GLfloat xs[NXGL_CLIPPED_POLYGON_MAX];
     GLfloat ys[NXGL_CLIPPED_POLYGON_MAX];
@@ -3871,7 +3871,7 @@ static bool polygon_front_facing(const N3Vertex *vertices, int count)
     return front_face_mode == GL_CCW ? area > 0.0f : area < 0.0f;
 }
 
-static void apply_two_sided_lighting(N3Vertex *vertices, int count)
+static void apply_two_sided_lighting(NxglBackendVertex *vertices, int count)
 {
     bool front;
 
@@ -3880,7 +3880,7 @@ static void apply_two_sided_lighting(N3Vertex *vertices, int count)
     }
     front = polygon_front_facing(vertices, count);
     for (int i = 0; i < count; ++i) {
-        N3Vec3 normal = vertices[i].normal;
+        NxglBackendVec3 normal = vertices[i].normal;
         const MaterialState *material = &material_state;
         if (!front) {
             normal.x = -normal.x;
@@ -3893,9 +3893,9 @@ static void apply_two_sided_lighting(N3Vertex *vertices, int count)
     }
 }
 
-static void emit_clipped_fill_polygon(const N3Vertex *vertices, int count)
+static void emit_clipped_fill_polygon(const NxglBackendVertex *vertices, int count)
 {
-    N3Vertex clipped[NXGL_CLIPPED_POLYGON_MAX];
+    NxglBackendVertex clipped[NXGL_CLIPPED_POLYGON_MAX];
     int clipped_count = 0;
 
     if (!clip_polygon_to_feedback_volume(vertices, count, clipped, &clipped_count)) {
@@ -3909,24 +3909,24 @@ static void emit_clipped_fill_polygon(const N3Vertex *vertices, int count)
         shadow_fill_bounds(clipped[0], clipped[1], clipped[2], clipped[3], true, false);
         for (int i = 1; i + 1 < clipped_count; ++i) {
             ensure_native_frame_started();
-            n3_push_triangle(clipped[0], clipped[i], clipped[i + 1]);
+            nxgl_backend_push_triangle(clipped[0], clipped[i], clipped[i + 1]);
         }
         return;
     }
 
     for (int i = 1; i + 1 < clipped_count; ++i) {
-        N3Vertex a = clipped[0];
-        N3Vertex b = clipped[i];
-        N3Vertex c = clipped[i + 1];
+        NxglBackendVertex a = clipped[0];
+        NxglBackendVertex b = clipped[i];
+        NxglBackendVertex c = clipped[i + 1];
         shadow_fill_bounds(a, b, c, c, false, false);
         ensure_native_frame_started();
-        n3_push_triangle(a, b, c);
+        nxgl_backend_push_triangle(a, b, c);
     }
 }
 
-static void emit_array_triangle(N3Vertex a, N3Vertex b, N3Vertex c)
+static void emit_array_triangle(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c)
 {
-    N3Vertex vertices[3] = { a, b, c };
+    NxglBackendVertex vertices[3] = { a, b, c };
     if (primitive_rejected_by_clip_planes(vertices, 3)) {
         return;
     }
@@ -3941,9 +3941,9 @@ static void emit_array_triangle(N3Vertex a, N3Vertex b, N3Vertex c)
     emit_clipped_fill_polygon(vertices, 3);
 }
 
-static void emit_array_quad(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d)
+static void emit_array_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d)
 {
-    N3Vertex vertices[4] = { a, b, c, d };
+    NxglBackendVertex vertices[4] = { a, b, c, d };
     if (primitive_rejected_by_clip_planes(vertices, 4)) {
         return;
     }
@@ -3958,13 +3958,13 @@ static void emit_array_quad(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d)
     emit_clipped_fill_polygon(vertices, 4);
 }
 
-static void emit_point_vertex(N3Vertex v)
+static void emit_point_vertex(NxglBackendVertex v)
 {
     float half = point_size * 0.0125f;
-    N3Vertex a = v;
-    N3Vertex b = v;
-    N3Vertex c = v;
-    N3Vertex d = v;
+    NxglBackendVertex a = v;
+    NxglBackendVertex b = v;
+    NxglBackendVertex c = v;
+    NxglBackendVertex d = v;
 
     if (primitive_rejected_by_clip_planes(&v, 1)) {
         return;
@@ -3986,20 +3986,20 @@ static void emit_point_vertex(N3Vertex v)
     c.pos.x += half; c.pos.y -= half;
     d.pos.x -= half; d.pos.y -= half;
     {
-        N3Vertex vertices[4] = { a, b, c, d };
+        NxglBackendVertex vertices[4] = { a, b, c, d };
         emit_clipped_fill_polygon(vertices, 4);
     }
 }
 
-static void emit_degenerate_line_vertex(N3Vertex v)
+static void emit_degenerate_line_vertex(NxglBackendVertex v)
 {
     GLfloat z;
     float half_x;
     float half_y;
-    N3Vertex a = v;
-    N3Vertex b = v;
-    N3Vertex c = v;
-    N3Vertex d = v;
+    NxglBackendVertex a = v;
+    NxglBackendVertex b = v;
+    NxglBackendVertex c = v;
+    NxglBackendVertex d = v;
 
     if (!project_depth_for_window(v.pos, &z)) {
         return;
@@ -4013,24 +4013,24 @@ static void emit_degenerate_line_vertex(N3Vertex v)
     d.pos.x -= half_x; d.pos.y -= half_y;
     shadow_fill_bounds(a, b, c, d, true, true);
     ensure_native_frame_started();
-    n3_push_quad(a, b, c, d);
+    nxgl_backend_push_quad(a, b, c, d);
 }
 
-static void emit_line_vertices(N3Vertex a, N3Vertex b)
+static void emit_line_vertices(NxglBackendVertex a, NxglBackendVertex b)
 {
-    N3Vertex clipped_a;
-    N3Vertex clipped_b;
+    NxglBackendVertex clipped_a;
+    NxglBackendVertex clipped_b;
     float dx;
     float dy;
     float len;
     float half = line_width * 0.01f;
     float nx;
     float ny;
-    N3Vertex v0;
-    N3Vertex v1;
-    N3Vertex v2;
-    N3Vertex v3;
-    N3Vertex vertices[2] = { a, b };
+    NxglBackendVertex v0;
+    NxglBackendVertex v1;
+    NxglBackendVertex v2;
+    NxglBackendVertex v3;
+    NxglBackendVertex vertices[2] = { a, b };
 
     if (primitive_rejected_by_clip_planes(vertices, 2)) {
         return;
@@ -4068,12 +4068,12 @@ static void emit_line_vertices(N3Vertex a, N3Vertex b)
     v3.pos.x -= nx; v3.pos.y -= ny;
     shadow_fill_bounds(v0, v1, v2, v3, true, true);
     ensure_native_frame_started();
-    n3_push_quad(v0, v1, v2, v3);
+    nxgl_backend_push_quad(v0, v1, v2, v3);
 }
 
-static void emit_triangle_vertices(N3Vertex a, N3Vertex b, N3Vertex c)
+static void emit_triangle_vertices(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c)
 {
-    N3Vertex vertices[3];
+    NxglBackendVertex vertices[3];
     if (shade_model == GL_FLAT) {
         a.color = c.color;
         b.color = c.color;
@@ -4110,9 +4110,9 @@ static void emit_triangle_vertices(N3Vertex a, N3Vertex b, N3Vertex c)
     }
 }
 
-static void emit_quad_vertices(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d)
+static void emit_quad_vertices(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d)
 {
-    N3Vertex vertices[4];
+    NxglBackendVertex vertices[4];
     if (shade_model == GL_FLAT) {
         a.color = d.color;
         b.color = d.color;
@@ -4154,7 +4154,7 @@ static void emit_quad_vertices(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d)
     }
 }
 
-static void emit_vertices(GLenum mode, const N3Vertex *vertices, GLsizei count)
+static void emit_vertices(GLenum mode, const NxglBackendVertex *vertices, GLsizei count)
 {
     if (mode == GL_TRIANGLES) {
         for (GLsizei i = 0; i + 2 < count; i += 3) {
@@ -4204,12 +4204,12 @@ static void emit_vertices(GLenum mode, const N3Vertex *vertices, GLsizei count)
 
 static void emit_array_vertices(GLenum mode, const GLint *indices, GLsizei count)
 {
-    N3Vertex *vertices;
+    NxglBackendVertex *vertices;
 
     if (count <= 0) {
         return;
     }
-    vertices = (N3Vertex *)malloc((size_t)count * sizeof(N3Vertex));
+    vertices = (NxglBackendVertex *)malloc((size_t)count * sizeof(NxglBackendVertex));
     if (vertices == NULL) {
         set_error(GL_OUT_OF_MEMORY);
         return;
@@ -4232,7 +4232,7 @@ static uint8_t channel(float value)
     return (uint8_t)(value * 255.0f);
 }
 
-static uint32_t color_to_u32(N3Color color)
+static uint32_t color_to_u32(NxglBackendColor color)
 {
     return ((uint32_t)channel(color.a) << 24) |
            ((uint32_t)channel(color.r) << 16) |
@@ -4317,7 +4317,7 @@ static GLfloat alpha_from_u32(uint32_t color)
     return (GLfloat)((color >> 24) & 0xffu) / 255.0f;
 }
 
-static GLfloat blend_factor_component(GLenum factor, int component, N3Color src, uint32_t dst)
+static GLfloat blend_factor_component(GLenum factor, int component, NxglBackendColor src, uint32_t dst)
 {
     GLfloat src_component = component == 0 ? src.r : (component == 1 ? src.g : src.b);
     GLfloat dst_component = component_from_u32(dst, component);
@@ -4351,9 +4351,9 @@ static GLfloat blend_factor_component(GLenum factor, int component, N3Color src,
     }
 }
 
-static uint32_t apply_blend(N3Color src, uint32_t dst)
+static uint32_t apply_blend(NxglBackendColor src, uint32_t dst)
 {
-    N3Color out;
+    NxglBackendColor out;
 
     if (!blend_enabled) {
         return color_to_u32(src);
@@ -4571,7 +4571,7 @@ static bool ensure_accum_buffer(void)
     return true;
 }
 
-static bool shadow_project(N3Vec3 pos, int *sx, int *sy)
+static bool shadow_project(NxglBackendVec3 pos, int *sx, int *sy)
 {
     GLfloat z;
     float x;
@@ -4587,7 +4587,7 @@ static bool shadow_project(N3Vec3 pos, int *sx, int *sy)
     return true;
 }
 
-static bool shadow_project_wide_x(N3Vec3 pos, int *sx, int *sy)
+static bool shadow_project_wide_x(NxglBackendVec3 pos, int *sx, int *sy)
 {
     GLfloat z;
     float x;
@@ -4605,7 +4605,7 @@ static bool shadow_project_wide_x(N3Vec3 pos, int *sx, int *sy)
     return true;
 }
 
-static bool shadow_project_rounded(N3Vec3 pos, int *sx, int *sy)
+static bool shadow_project_rounded(NxglBackendVec3 pos, int *sx, int *sy)
 {
     GLfloat z;
     float x;
@@ -4631,7 +4631,7 @@ static bool cube_texture_enabled_for_shadow(void)
     return false;
 }
 
-static GLfloat shadow_depth_value(const N3Vertex *vertices, int count)
+static GLfloat shadow_depth_value(const NxglBackendVertex *vertices, int count)
 {
     GLfloat sum = 0.0f;
 
@@ -4652,7 +4652,7 @@ static GLfloat shadow_depth_value(const N3Vertex *vertices, int count)
 
 static void set_raster_position_from_vertex4(float x, float y, float z, float w)
 {
-    N3Vertex vertex;
+    NxglBackendVertex vertex;
     int sx = 0;
     int sy = 0;
 
@@ -4769,7 +4769,7 @@ static GLfloat map_index_to_component(GLuint index, int map_index)
     return clamp01(map->values[index]);
 }
 
-static N3Color apply_pixel_transfer_rgba_color(const uint8_t rgba[4])
+static NxglBackendColor apply_pixel_transfer_rgba_color(const uint8_t rgba[4])
 {
     GLfloat channels[4] = {
         (GLfloat)rgba[0] / 255.0f,
@@ -4781,12 +4781,12 @@ static N3Color apply_pixel_transfer_rgba_color(const uint8_t rgba[4])
     channels[1] = map_component(clamp01(channels[1] * pixel_transfer_scale[1] + pixel_transfer_bias[1]), pixel_map_index(GL_PIXEL_MAP_G_TO_G));
     channels[2] = map_component(clamp01(channels[2] * pixel_transfer_scale[2] + pixel_transfer_bias[2]), pixel_map_index(GL_PIXEL_MAP_B_TO_B));
     channels[3] = map_component(clamp01(channels[3] * pixel_transfer_scale[3] + pixel_transfer_bias[3]), pixel_map_index(GL_PIXEL_MAP_A_TO_A));
-    return (N3Color){ channels[0], channels[1], channels[2], channels[3] };
+    return (NxglBackendColor){ channels[0], channels[1], channels[2], channels[3] };
 }
 
 static uint32_t apply_pixel_transfer_rgba(const uint8_t rgba[4])
 {
-    N3Color color = apply_pixel_transfer_rgba_color(rgba);
+    NxglBackendColor color = apply_pixel_transfer_rgba_color(rgba);
     return color_to_u32(color);
 }
 
@@ -4824,7 +4824,7 @@ static bool pixel_inside_scissor(GLint x, GLint y)
            y < scissor_box[1] + scissor_box[3];
 }
 
-static void write_shadow_color_fragment(GLint x, GLint y, N3Color color, GLfloat depth)
+static void write_shadow_color_fragment(GLint x, GLint y, NxglBackendColor color, GLfloat depth)
 {
     uint32_t *dst;
     uint32_t src;
@@ -4866,7 +4866,7 @@ static void write_shadow_color_fragment(GLint x, GLint y, N3Color color, GLfloat
 
 static void write_shadow_pixel(GLint x, GLint y, uint32_t color)
 {
-    N3Color src = {
+    NxglBackendColor src = {
         (GLfloat)((color >> 16) & 0xffu) / 255.0f,
         (GLfloat)((color >> 8) & 0xffu) / 255.0f,
         (GLfloat)(color & 0xffu) / 255.0f,
@@ -4955,7 +4955,7 @@ static void decode_rgb565(uint16_t value, uint8_t out[4])
     out[3] = 255;
 }
 
-static N3Color sample_dxt_color(const TextureLevel *image, int x, int y)
+static NxglBackendColor sample_dxt_color(const TextureLevel *image, int x, int y)
 {
     int block_size = compressed_block_size((GLenum)image->internal_format);
     int blocks_w = (image->width + 3) / 4;
@@ -5034,7 +5034,7 @@ static N3Color sample_dxt_color(const TextureLevel *image, int x, int y)
     if (image->internal_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT && color0 <= color1 && index == 3) {
         alpha = 0;
     }
-    return (N3Color){
+    return (NxglBackendColor){
         (GLfloat)colors[index][0] / 255.0f,
         (GLfloat)colors[index][1] / 255.0f,
         (GLfloat)colors[index][2] / 255.0f,
@@ -5042,7 +5042,7 @@ static N3Color sample_dxt_color(const TextureLevel *image, int x, int y)
     };
 }
 
-static N3Color sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
+static NxglBackendColor sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
 {
     TextureObject *texture;
     TextureLevel *image;
@@ -5051,7 +5051,7 @@ static N3Color sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
     int y;
 
     if (unit < 0 || unit >= 4) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
     if (texture_2d_enabled[unit] && texture_binding_2d[unit] > 0 && texture_binding_2d[unit] < 16) {
         texture = &texture_objects[texture_binding_2d[unit]];
@@ -5061,10 +5061,10 @@ static N3Color sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
         image = select_texture_level_for_lod(texture, texture->levels_1d, 0.0f);
         v = 0.0f;
     } else {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
     if (!texture->allocated || image == NULL || !image->defined) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
 
     if (texture->wrap_s == GL_REPEAT) {
@@ -5087,16 +5087,16 @@ static N3Color sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
 
     if (image->compressed) {
         if (image->compressed_data == NULL) {
-            return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+            return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
         }
         return sample_dxt_color(image, x, y);
     }
     if (image->rgba == NULL) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
 
     pixel = image->rgba + ((size_t)y * (size_t)image->width + (size_t)x) * 4u;
-    return (N3Color){
+    return (NxglBackendColor){
         (GLfloat)pixel[0] / 255.0f,
         (GLfloat)pixel[1] / 255.0f,
         (GLfloat)pixel[2] / 255.0f,
@@ -5104,7 +5104,7 @@ static N3Color sample_bound_texture_unit_color(int unit, GLfloat u, GLfloat v)
     };
 }
 
-static N3Color sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat t, GLfloat r)
+static NxglBackendColor sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat t, GLfloat r)
 {
     TextureObject *texture;
     TextureLevel *image;
@@ -5122,11 +5122,11 @@ static N3Color sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat
     int y;
 
     if (unit < 0 || unit >= 4 || !texture_cube_map_enabled[unit] || texture_binding_cube_map[unit] == 0 || texture_binding_cube_map[unit] >= 16) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
     texture = &texture_objects[texture_binding_cube_map[unit]];
     if (!texture->allocated || !cube_levels_complete(texture)) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
 
     if (abs_s >= abs_t && abs_s >= abs_r) {
@@ -5176,7 +5176,7 @@ static N3Color sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat
     {
         GLint level = select_cube_level_for_lod(texture, 0.0f);
         if (level < 0) {
-            return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+            return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
         }
         image = &texture->cube_faces[face][level];
     }
@@ -5188,7 +5188,7 @@ static N3Color sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat
     if (y >= image->height) y = image->height - 1;
 
     pixel = image->rgba + ((size_t)y * (size_t)image->width + (size_t)x) * 4u;
-    return (N3Color){
+    return (NxglBackendColor){
         (GLfloat)pixel[0] / 255.0f,
         (GLfloat)pixel[1] / 255.0f,
         (GLfloat)pixel[2] / 255.0f,
@@ -5196,7 +5196,7 @@ static N3Color sample_bound_cube_texture_unit_color(int unit, GLfloat s, GLfloat
     };
 }
 
-static N3Color sample_bound_texture3d_unit_color(int unit, GLfloat u, GLfloat v, GLfloat r)
+static NxglBackendColor sample_bound_texture3d_unit_color(int unit, GLfloat u, GLfloat v, GLfloat r)
 {
     TextureObject *texture;
     TextureLevel *image;
@@ -5206,12 +5206,12 @@ static N3Color sample_bound_texture3d_unit_color(int unit, GLfloat u, GLfloat v,
     int z;
 
     if (unit < 0 || unit >= 4 || !texture_3d_enabled[unit] || texture_binding_3d[unit] == 0 || texture_binding_3d[unit] >= 16) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
     texture = &texture_objects[texture_binding_3d[unit]];
     image = select_texture_level_for_lod(texture, texture->levels_3d, 0.0f);
     if (!texture->allocated || image == NULL || !image->defined || image->compressed || image->rgba == NULL) {
-        return (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+        return (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     }
 
     if (texture->wrap_s == GL_REPEAT) {
@@ -5241,7 +5241,7 @@ static N3Color sample_bound_texture3d_unit_color(int unit, GLfloat u, GLfloat v,
     if (z >= image->depth) z = image->depth - 1;
 
     pixel = image->rgba + (((size_t)z * (size_t)image->height + (size_t)y) * (size_t)image->width + (size_t)x) * 4u;
-    return (N3Color){
+    return (NxglBackendColor){
         (GLfloat)pixel[0] / 255.0f,
         (GLfloat)pixel[1] / 255.0f,
         (GLfloat)pixel[2] / 255.0f,
@@ -5260,7 +5260,7 @@ static bool texture_unit_enabled_for_shadow(int unit)
            texture_cube_map_enabled[unit];
 }
 
-static N3Color sample_bound_texture_color_for_unit(int unit, GLfloat u, GLfloat v, GLfloat r)
+static NxglBackendColor sample_bound_texture_color_for_unit(int unit, GLfloat u, GLfloat v, GLfloat r)
 {
     if (texture_cube_map_enabled[unit]) {
         return sample_bound_cube_texture_unit_color(unit, u, v, r);
@@ -5271,7 +5271,7 @@ static N3Color sample_bound_texture_color_for_unit(int unit, GLfloat u, GLfloat 
     return sample_bound_texture_unit_color(unit, u, v);
 }
 
-static N3Color combine_source_color(int unit, GLenum source, N3Color primary, N3Color previous, N3Color texel,
+static NxglBackendColor combine_source_color(int unit, GLenum source, NxglBackendColor primary, NxglBackendColor previous, NxglBackendColor texel,
                                     const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
     if (source == GL_TEXTURE) {
@@ -5290,7 +5290,7 @@ static N3Color combine_source_color(int unit, GLenum source, N3Color primary, N3
     return previous;
 }
 
-static GLfloat combine_operand_component(N3Color source, GLenum operand, int component)
+static GLfloat combine_operand_component(NxglBackendColor source, GLenum operand, int component)
 {
     GLfloat color_component = component == 0 ? source.r : (component == 1 ? source.g : source.b);
 
@@ -5306,17 +5306,17 @@ static GLfloat combine_operand_component(N3Color source, GLenum operand, int com
     return color_component;
 }
 
-static GLfloat combine_arg_component(int unit, int arg, int component, N3Color primary, N3Color previous, N3Color texel,
+static GLfloat combine_arg_component(int unit, int arg, int component, NxglBackendColor primary, NxglBackendColor previous, NxglBackendColor texel,
                                      const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
-    N3Color source = combine_source_color(unit, texture_source_rgb[unit][arg], primary, previous, texel, u, v, r);
+    NxglBackendColor source = combine_source_color(unit, texture_source_rgb[unit][arg], primary, previous, texel, u, v, r);
     return combine_operand_component(source, texture_operand_rgb[unit][arg], component);
 }
 
-static GLfloat combine_alpha_arg_component(int unit, int arg, N3Color primary, N3Color previous, N3Color texel,
+static GLfloat combine_alpha_arg_component(int unit, int arg, NxglBackendColor primary, NxglBackendColor previous, NxglBackendColor texel,
                                            const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
-    N3Color source = combine_source_color(unit, texture_source_alpha[unit][arg], primary, previous, texel, u, v, r);
+    NxglBackendColor source = combine_source_color(unit, texture_source_alpha[unit][arg], primary, previous, texel, u, v, r);
 
     if (texture_operand_alpha[unit][arg] == GL_ONE_MINUS_SRC_ALPHA) {
         return 1.0f - source.a;
@@ -5324,7 +5324,7 @@ static GLfloat combine_alpha_arg_component(int unit, int arg, N3Color primary, N
     return source.a;
 }
 
-static GLfloat combine_alpha_value(int unit, N3Color primary, N3Color previous, N3Color texel,
+static GLfloat combine_alpha_value(int unit, NxglBackendColor primary, NxglBackendColor previous, NxglBackendColor texel,
                                    const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
     GLfloat arg0 = combine_alpha_arg_component(unit, 0, primary, previous, texel, u, v, r);
@@ -5348,10 +5348,10 @@ static GLfloat combine_alpha_value(int unit, N3Color primary, N3Color previous, 
     return clamp01(value * texture_alpha_scale[unit]);
 }
 
-static N3Color combined_texture_env_color(int unit, N3Color primary, N3Color previous, N3Color texel,
+static NxglBackendColor combined_texture_env_color(int unit, NxglBackendColor primary, NxglBackendColor previous, NxglBackendColor texel,
                                           const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
-    N3Color out = previous;
+    NxglBackendColor out = previous;
     GLfloat arg[3];
 
     if (texture_combine_rgb[unit] == GL_DOT3_RGB || texture_combine_rgb[unit] == GL_DOT3_RGBA) {
@@ -5413,12 +5413,12 @@ static N3Color combined_texture_env_color(int unit, N3Color primary, N3Color pre
     return out;
 }
 
-static N3Color texture_env_color_for_shadow_unit(int unit, N3Color primary, N3Color previous,
+static NxglBackendColor texture_env_color_for_shadow_unit(int unit, NxglBackendColor primary, NxglBackendColor previous,
                                                  const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
-    N3Color texel = sample_bound_texture_color_for_unit(unit, u[unit], v[unit], r[unit]);
-    N3Color env = texture_env_color[unit];
-    N3Color out = previous;
+    NxglBackendColor texel = sample_bound_texture_color_for_unit(unit, u[unit], v[unit], r[unit]);
+    NxglBackendColor env = texture_env_color[unit];
+    NxglBackendColor out = previous;
 
     if (!texture_unit_enabled_for_shadow(unit)) {
         return previous;
@@ -5483,9 +5483,9 @@ static void mark_crossbar_source_units(int unit, bool source_only[4])
     }
 }
 
-static N3Color texture_env_color_for_shadow(N3Color primary, const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
+static NxglBackendColor texture_env_color_for_shadow(NxglBackendColor primary, const GLfloat u[4], const GLfloat v[4], const GLfloat r[4])
 {
-    N3Color color = primary;
+    NxglBackendColor color = primary;
     bool source_only[4] = { false, false, false, false };
 
     for (int unit = 0; unit < 4; ++unit) {
@@ -5518,7 +5518,7 @@ static bool shadow_stipple_allows(int x, int y, bool line)
     return true;
 }
 
-static void shadow_fill_bounds(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d, bool quad, bool line)
+static void shadow_fill_bounds(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d, bool quad, bool line)
 {
     int xs[4];
     int ys[4];
@@ -5527,7 +5527,7 @@ static void shadow_fill_bounds(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d, b
     int max_x;
     int min_y;
     int max_y;
-    N3Color base_color = quad ? d.color : c.color;
+    NxglBackendColor base_color = quad ? d.color : c.color;
     GLfloat sample_u[4] = {
         quad ? (a.u + b.u + c.u + d.u) * 0.25f : (a.u + b.u + c.u) / 3.0f,
         quad ? (a.u1 + b.u1 + c.u1 + d.u1) * 0.25f : (a.u1 + b.u1 + c.u1) / 3.0f,
@@ -5546,30 +5546,30 @@ static void shadow_fill_bounds(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d, b
         quad ? (a.r2 + b.r2 + c.r2 + d.r2) * 0.25f : (a.r2 + b.r2 + c.r2) / 3.0f,
         quad ? (a.r3 + b.r3 + c.r3 + d.r3) * 0.25f : (a.r3 + b.r3 + c.r3) / 3.0f
     };
-    N3Color shaded;
+    NxglBackendColor shaded;
     GLfloat depth;
-    N3Vertex vertices[4] = { a, b, c, d };
+    NxglBackendVertex vertices[4] = { a, b, c, d };
     bool cube_shadow = cube_texture_enabled_for_shadow();
 
     if (quad) {
-        base_color = (N3Color){
+        base_color = (NxglBackendColor){
             (a.color.r + b.color.r + c.color.r + d.color.r) * 0.25f,
             (a.color.g + b.color.g + c.color.g + d.color.g) * 0.25f,
             (a.color.b + b.color.b + c.color.b + d.color.b) * 0.25f,
             (a.color.a + b.color.a + c.color.a + d.color.a) * 0.25f
         };
         if (lighting_enabled && light_model_local_viewer) {
-            N3Vec3 center_eye = {
+            NxglBackendVec3 center_eye = {
                 (a.eye.x + b.eye.x + c.eye.x + d.eye.x) * 0.25f,
                 (a.eye.y + b.eye.y + c.eye.y + d.eye.y) * 0.25f,
                 (a.eye.z + b.eye.z + c.eye.z + d.eye.z) * 0.25f
             };
-            N3Vec3 center_normal = normalize_vec3((N3Vec3){
+            NxglBackendVec3 center_normal = normalize_vec3((NxglBackendVec3){
                 (a.normal.x + b.normal.x + c.normal.x + d.normal.x) * 0.25f,
                 (a.normal.y + b.normal.y + c.normal.y + d.normal.y) * 0.25f,
                 (a.normal.z + b.normal.z + c.normal.z + d.normal.z) * 0.25f
             });
-            N3Color center_base = {
+            NxglBackendColor center_base = {
                 (a.base_color.r + b.base_color.r + c.base_color.r + d.base_color.r) * 0.25f,
                 (a.base_color.g + b.base_color.g + c.base_color.g + d.base_color.g) * 0.25f,
                 (a.base_color.b + b.base_color.b + c.base_color.b + d.base_color.b) * 0.25f,
@@ -5578,7 +5578,7 @@ static void shadow_fill_bounds(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d, b
             base_color = lit_color(center_base, center_normal, center_eye);
         }
     } else {
-        base_color = (N3Color){
+        base_color = (NxglBackendColor){
             (a.color.r + b.color.r + c.color.r) / 3.0f,
             (a.color.g + b.color.g + c.color.g) / 3.0f,
             (a.color.b + b.color.b + c.color.b) / 3.0f,
@@ -5683,7 +5683,7 @@ int nxglInit(void)
     texture_stack_top = 0;
     attrib_stack_top = 0;
     client_attrib_stack_top = 0;
-    current_color = (N3Color){ 1.0f, 1.0f, 1.0f, 1.0f };
+    current_color = (NxglBackendColor){ 1.0f, 1.0f, 1.0f, 1.0f };
     current_index = 0.0f;
     active_texture = GL_TEXTURE0;
     client_active_texture = GL_TEXTURE0;
@@ -5707,7 +5707,7 @@ int nxglInit(void)
         current_v[i] = 0.0f;
         current_r[i] = 0.0f;
         texture_env_mode[i] = GL_MODULATE;
-        texture_env_color[i] = (N3Color){ 0.0f, 0.0f, 0.0f, 0.0f };
+        texture_env_color[i] = (NxglBackendColor){ 0.0f, 0.0f, 0.0f, 0.0f };
         texture_combine_rgb[i] = GL_MODULATE;
         texture_combine_alpha[i] = GL_MODULATE;
         texture_source_rgb[i][0] = GL_TEXTURE;
@@ -5766,12 +5766,12 @@ int nxglInit(void)
     clear_color_value[3] = 0.0f;
     clear_index_value = 0.0f;
     clear_color = 0x00000000;
-    current_normal = (N3Vec3){ 0.0f, 0.0f, 1.0f };
+    current_normal = (NxglBackendVec3){ 0.0f, 0.0f, 1.0f };
     lighting_enabled = false;
     light_model_local_viewer = false;
     light_model_two_side = false;
     light_model_color_control = GL_SINGLE_COLOR;
-    light_model_ambient = (N3Color){ 0.2f, 0.2f, 0.2f, 1.0f };
+    light_model_ambient = (NxglBackendColor){ 0.2f, 0.2f, 0.2f, 1.0f };
     color_material_enabled = false;
     fog_enabled = false;
     normalize_enabled = false;
@@ -5826,7 +5826,7 @@ int nxglInit(void)
     sample_coverage_value = 1.0f;
     sample_coverage_invert = GL_FALSE;
     fog_mode = GL_EXP;
-    fog_color = (N3Color){ 0.0f, 0.0f, 0.0f, 0.0f };
+    fog_color = (NxglBackendColor){ 0.0f, 0.0f, 0.0f, 0.0f };
     fog_density = 1.0f;
     fog_start = 0.0f;
     fog_end = 1.0f;
@@ -5911,18 +5911,18 @@ int nxglInit(void)
     camera_z = -6.0f;
     last_error = GL_NO_ERROR;
     native_frame_started = false;
-    status = n3_init();
+    status = nxgl_backend_init();
     if (status != 0) {
         return status;
     }
-    shadow_width = n3_back_buffer_width();
-    shadow_height = n3_back_buffer_height();
+    shadow_width = nxgl_backend_back_buffer_width();
+    shadow_height = nxgl_backend_back_buffer_height();
     viewport[2] = shadow_width;
     viewport[3] = shadow_height;
     scissor_box[2] = shadow_width;
     scissor_box[3] = shadow_height;
     if (shadow_width > SHADOW_MAX_WIDTH || shadow_height > SHADOW_MAX_HEIGHT) {
-        n3_shutdown();
+        nxgl_backend_shutdown();
         return 1;
     }
     shadow_color_buffer = (uint32_t *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(uint32_t),
@@ -5931,7 +5931,7 @@ int nxglInit(void)
                                                                     0,
                                                                     PAGE_READWRITE);
     if (shadow_color_buffer == NULL) {
-        n3_shutdown();
+        nxgl_backend_shutdown();
         return 1;
     }
     shadow_depth_buffer = (float *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(float),
@@ -5942,7 +5942,7 @@ int nxglInit(void)
     if (shadow_depth_buffer == NULL) {
         MmFreeContiguousMemory(shadow_color_buffer);
         shadow_color_buffer = NULL;
-        n3_shutdown();
+        nxgl_backend_shutdown();
         return 1;
     }
     shadow_stencil_buffer = (uint8_t *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(uint8_t),
@@ -5955,7 +5955,7 @@ int nxglInit(void)
         shadow_depth_buffer = NULL;
         MmFreeContiguousMemory(shadow_color_buffer);
         shadow_color_buffer = NULL;
-        n3_shutdown();
+        nxgl_backend_shutdown();
         return 1;
     }
     shadow_clear(clear_color);
@@ -5989,7 +5989,7 @@ void nxglShutdown(void)
     for (int i = 1; i < 256; ++i) {
         clear_display_list(&display_lists[i]);
     }
-    n3_shutdown();
+    nxgl_backend_shutdown();
 }
 
 void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz)
@@ -5997,13 +5997,13 @@ void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz)
     camera_x = x;
     camera_y = y;
     camera_z = z;
-    n3_set_camera(x, y, z, rx, ry, rz);
+    nxgl_backend_set_camera(x, y, z, rx, ry, rz);
 }
 
 void nxglSwapBuffers(const char *title, const char *detail)
 {
     ensure_native_frame_started();
-    n3_finish(title, detail);
+    nxgl_backend_finish(title, detail);
     native_frame_started = false;
 }
 
@@ -7214,14 +7214,14 @@ void glClear(uint32_t mask)
     }
 
     ensure_native_frame_started();
-    n3_flush();
+    nxgl_backend_flush();
     {
         int min_x, min_y, max_x, max_y;
         if (shadow_clear_bounds(&min_x, &min_y, &max_x, &max_y)) {
             int width = max_x - min_x + 1;
             int height = max_y - min_y + 1;
             if ((mask & GL_COLOR_BUFFER_BIT) != 0 && draw_buffer_mode != GL_NONE) {
-                n3_clear_color(clear_color,
+                nxgl_backend_clear_color(clear_color,
                                color_write_mask[0] == GL_TRUE,
                                color_write_mask[1] == GL_TRUE,
                                color_write_mask[2] == GL_TRUE,
@@ -7230,7 +7230,7 @@ void glClear(uint32_t mask)
             }
             if (((mask & GL_DEPTH_BUFFER_BIT) != 0 && depth_write_enabled) ||
                 ((mask & GL_STENCIL_BUFFER_BIT) != 0 && (stencil_write_mask & 0xffu) == 0xffu)) {
-                n3_clear_depth_stencil((mask & GL_DEPTH_BUFFER_BIT) != 0 && depth_write_enabled,
+                nxgl_backend_clear_depth_stencil((mask & GL_DEPTH_BUFFER_BIT) != 0 && depth_write_enabled,
                                        depth_clear_value,
                                        (mask & GL_STENCIL_BUFFER_BIT) != 0 && (stencil_write_mask & 0xffu) == 0xffu,
                                        (uint8_t)(stencil_clear_value & 0xff),
@@ -7288,7 +7288,7 @@ void glAccum(GLenum op, GLfloat value)
         return;
     }
 
-    n3_flush();
+    nxgl_backend_flush();
     count = (size_t)shadow_width * (size_t)shadow_height;
     if (op == GL_ACCUM || op == GL_LOAD) {
         for (size_t i = 0; i < count; ++i) {
@@ -7775,7 +7775,7 @@ void glColor4f(float r, float g, float b, float a)
         return;
     }
 
-    current_color = (N3Color){ r, g, b, a };
+    current_color = (NxglBackendColor){ r, g, b, a };
     apply_color_material(current_color);
 }
 
@@ -7875,12 +7875,12 @@ void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
     if (compile_only()) {
         return;
     }
-    current_normal = (N3Vec3){ x, y, z };
+    current_normal = (NxglBackendVec3){ x, y, z };
 }
 
 static void glNormal3f_normalized(GLfloat x, GLfloat y, GLfloat z)
 {
-    N3Vec3 normal = normalize_vec3((N3Vec3){ x, y, z });
+    NxglBackendVec3 normal = normalize_vec3((NxglBackendVec3){ x, y, z });
     glNormal3f(normal.x, normal.y, normal.z);
 }
 
@@ -8329,7 +8329,7 @@ void glVertex3dv(const GLdouble *v)
 
 void glVertex3f(float x, float y, float z)
 {
-    N3Vertex vertex;
+    NxglBackendVertex vertex;
     GLfloat obj[4] = { x, y, z, 1.0f };
     GLfloat u0 = current_u[0];
     GLfloat v0 = current_v[0];
@@ -8359,7 +8359,7 @@ void glVertex3f(float x, float y, float z)
 
     memset(&vertex, 0, sizeof(vertex));
     init_vertex_position(&vertex, x, y, z, 1.0f);
-    N3Vec3 normal = transform_normal_to_eye(current_normal);
+    NxglBackendVec3 normal = transform_normal_to_eye(current_normal);
     vertex.base_color = current_color;
     vertex.normal = normal;
     apply_texgen_to_coords(obj, vertex.eye, normal, &u0, &v0, &r0, 0);
@@ -8882,7 +8882,7 @@ void glLightModelfv(GLenum pname, const GLfloat *params)
         if (compile_only()) {
             return;
         }
-        light_model_ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        light_model_ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if (pname == GL_LIGHT_MODEL_LOCAL_VIEWER) {
         glLightModeli(pname, params[0] != 0.0f ? 1 : 0);
     } else if (pname == GL_LIGHT_MODEL_TWO_SIDE) {
@@ -9034,11 +9034,11 @@ void glLightfv(GLenum light, GLenum pname, const GLfloat *params)
     }
 
     if (pname == GL_AMBIENT) {
-        lights[index].ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        lights[index].ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if (pname == GL_DIFFUSE) {
-        lights[index].diffuse = (N3Color){ params[0], params[1], params[2], params[3] };
+        lights[index].diffuse = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if (pname == GL_SPECULAR) {
-        lights[index].specular = (N3Color){ params[0], params[1], params[2], params[3] };
+        lights[index].specular = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if (pname == GL_POSITION) {
         lights[index].position[0] = params[0];
         lights[index].position[1] = params[1];
@@ -9190,16 +9190,16 @@ void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params)
     }
 
     if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_AMBIENT) {
-        material_state.ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_state.ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_DIFFUSE) {
-        material_state.diffuse = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_state.diffuse = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_AMBIENT_AND_DIFFUSE) {
-        material_state.ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_state.ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
         material_state.diffuse = material_state.ambient;
     } else if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_SPECULAR) {
-        material_state.specular = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_state.specular = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_EMISSION) {
-        material_state.emission = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_state.emission = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_FRONT || face == GL_FRONT_AND_BACK) && pname == GL_SHININESS) {
         if (params[0] < 0.0f || params[0] > 128.0f) {
             set_error(GL_INVALID_VALUE);
@@ -9209,16 +9209,16 @@ void glMaterialfv(GLenum face, GLenum pname, const GLfloat *params)
     }
 
     if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_AMBIENT) {
-        material_back_state.ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_back_state.ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_DIFFUSE) {
-        material_back_state.diffuse = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_back_state.diffuse = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_AMBIENT_AND_DIFFUSE) {
-        material_back_state.ambient = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_back_state.ambient = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
         material_back_state.diffuse = material_back_state.ambient;
     } else if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_SPECULAR) {
-        material_back_state.specular = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_back_state.specular = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_EMISSION) {
-        material_back_state.emission = (N3Color){ params[0], params[1], params[2], params[3] };
+        material_back_state.emission = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
     } else if ((face == GL_BACK || face == GL_FRONT_AND_BACK) && pname == GL_SHININESS) {
         if (params[0] < 0.0f || params[0] > 128.0f) {
             set_error(GL_INVALID_VALUE);
@@ -9403,7 +9403,7 @@ void glFogfv(GLenum pname, const GLfloat *params)
     if (pname == GL_FOG_MODE) {
         fog_mode = (GLenum)(GLint)params[0];
     } else if (pname == GL_FOG_COLOR) {
-        fog_color = clamp_color((N3Color){ params[0], params[1], params[2], params[3] });
+        fog_color = clamp_color((NxglBackendColor){ params[0], params[1], params[2], params[3] });
     } else if (pname == GL_FOG_DENSITY) {
         fog_density = params[0];
     } else if (pname == GL_FOG_START) {
@@ -10194,7 +10194,7 @@ void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format
         return;
     }
 
-    n3_flush();
+    nxgl_backend_flush();
 
     if (color_read) {
         comps = source_components(format);
@@ -10635,7 +10635,7 @@ void glDrawPixels(GLsizei width, GLsizei height, GLenum format, GLenum type, con
             GLint base_x = pixel_zoom_x > 0.0f ? raster_x + col * zoom_x : raster_x - (col + 1) * zoom_x;
             const uint8_t *src_pixel = color_draw ? rgba + ((size_t)row * (size_t)width + (size_t)col) * 4u
                                                   : src_row + (size_t)col * pixel_bytes;
-            N3Color color = { 0.0f, 0.0f, 0.0f, 1.0f };
+            NxglBackendColor color = { 0.0f, 0.0f, 0.0f, 1.0f };
             GLfloat depth = 0.0f;
             uint8_t stencil = 0;
 
@@ -10721,7 +10721,7 @@ void glCopyPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum type)
     }
 
     if (color_copy) {
-        n3_flush();
+        nxgl_backend_flush();
     }
 
     copy = NULL;
@@ -11844,7 +11844,7 @@ void glInterleavedArrays(GLenum format, GLsizei stride, const GLvoid *pointer)
 
 void glArrayElement(GLint index)
 {
-    N3Vertex vertex;
+    NxglBackendVertex vertex;
 
     if (begin_mode == NXGL_NO_BEGIN_MODE || index < 0 || pending_count >= (int)(sizeof(pending) / sizeof(pending[0]))) {
         set_error(GL_INVALID_OPERATION);
@@ -12646,7 +12646,7 @@ void glTexEnvfv(GLenum target, GLenum pname, const GLfloat *params)
             } else if (pname == GL_ALPHA_SCALE) {
                 texture_alpha_scale[unit] = params[0];
             } else {
-        texture_env_color[unit] = (N3Color){ params[0], params[1], params[2], params[3] };
+        texture_env_color[unit] = (NxglBackendColor){ params[0], params[1], params[2], params[3] };
             }
         }
     }

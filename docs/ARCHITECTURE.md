@@ -28,9 +28,10 @@ renderer contract used by the GL state layer. The backend owns PBKit setup,
 GPU-facing texture storage, draw submission, scissor/depth/blend/cull state, and
 shader selection.
 
-The backend is still bundled because the current implementation shares concrete
-types between the state layer and renderer. Keeping it under `src/backend/`
-makes that coupling explicit and leaves a path for a cleaner backend interface.
+The state layer only refers to backend-facing types and calls through the
+`NxglBackend*` and `nxgl_backend_*` namespace. Keeping the PBKit implementation
+under `src/backend/` makes the current renderer explicit while leaving room for
+the interface to be moved, mocked, or swapped later.
 
 ## Shaders
 
@@ -40,3 +41,5 @@ Shader sources live as `.cg` files. Generated `.inl` files are build outputs.
 
 Compatibility is tracked in `docs/opengl_coverage.md`. A feature should only be
 marked verified when it has focused probe coverage and a runnable nxdk build.
+The runnable probes live in `validation/`; the autorun suite regenerates its
+probe table from that directory at build time.

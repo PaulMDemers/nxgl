@@ -21,6 +21,9 @@ map.
   selection, feedback, and pixel-path behavior.
 - `src/backend/` contains the current PBKit renderer backend and shader sources.
 - `src/common3d/` contains shared backend shader sources.
+- `examples/` contains small standalone nxdk consumers of `nxgl.mk`.
+- `validation/` contains the focused probe apps and autorun suite used to track
+  compatibility behavior.
 - `nxgl.mk` exports the source, include, and shader variables used by nxdk apps.
 
 Generated shader `.inl` files are build artifacts and are not tracked.
@@ -50,6 +53,8 @@ Then include the API from application code:
 - [`docs/BUILDING.md`](docs/BUILDING.md): build environment and smoke checks.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): library layout and backend
   boundaries.
+- [`docs/COMPATIBILITY_PASS.md`](docs/COMPATIBILITY_PASS.md): current texture,
+  lighting, and raster-edge validation focus.
 - [`docs/RELEASE.md`](docs/RELEASE.md): release checklist.
 - [`docs/opengl_coverage.md`](docs/opengl_coverage.md): compatibility coverage.
 

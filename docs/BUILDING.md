@@ -27,7 +27,19 @@ make
 make print-vars
 ```
 
-For a real build, include NXGL from an nxdk consumer app:
+The smallest real nxdk consumer is included in `examples/hello_triangle`:
+
+```sh
+make -C examples/hello_triangle
+```
+
+The repository root also exposes this as:
+
+```sh
+make example
+```
+
+For an external build, include NXGL from an nxdk consumer app:
 
 ```sh
 cd /path/to/consumer
@@ -39,3 +51,27 @@ make
 
 The nxdk shader path generates `.inl` files from `.cg` shader sources. Those
 files are ignored and should not be committed.
+
+## Validation Probes
+
+Focused compatibility probes live in `validation/`. Build the autorun suite or a
+single probe with:
+
+```sh
+make -C validation/autorun_suite
+make -C validation/48_gl_cubemap_render_probe
+```
+
+The autorun suite is also available from the root:
+
+```sh
+make validation-autorun
+```
+
+Grouped probe targets are available for the current compatibility focus:
+
+```sh
+make -C validation texture
+make -C validation lighting
+make -C validation raster
+```

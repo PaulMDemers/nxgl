@@ -12,3 +12,4 @@ build/
 dist/
 *.inl
 *.inl.*
+validation/autorun_suite/generated/

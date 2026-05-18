@@ -11,18 +11,18 @@
 #include <windows.h>
 #include <xboxkrnl/xboxkrnl.h>
 
-#define N3_SCREEN_W 640
-#define N3_SCREEN_H 480
-#define N3_MAX_VERTICES 32768
-#define N3_MAX_BATCHES 256
-#define N3_MAXRAM 0x03FFAFFF
+#define NXGL_BACKEND_SCREEN_W 640
+#define NXGL_BACKEND_SCREEN_H 480
+#define NXGL_BACKEND_MAX_VERTICES 32768
+#define NXGL_BACKEND_MAX_BATCHES 256
+#define NXGL_BACKEND_MAXRAM 0x03FFAFFF
 #define MASK(mask, val) (((val) << (ffs(mask) - 1)) & (mask))
-#define N3_TEXTURE_FORMAT_RGBA 0x0001122a
-#define N3_TEXTURE_FORMAT_RGBA3D 0x0001123a
-#define N3_TEXTURE_FORMAT_DXT1 0x00010c2a
-#define N3_TEXTURE_FORMAT_DXT3 0x00010e2a
-#define N3_TEXTURE_FORMAT_DXT5 0x00010f2a
-#define N3_TEXTURE_WRAP_REPEAT 0x00010101
+#define NXGL_BACKEND_TEXTURE_FORMAT_RGBA 0x0001122a
+#define NXGL_BACKEND_TEXTURE_FORMAT_RGBA3D 0x0001123a
+#define NXGL_BACKEND_TEXTURE_FORMAT_DXT1 0x00010c2a
+#define NXGL_BACKEND_TEXTURE_FORMAT_DXT3 0x00010e2a
+#define NXGL_BACKEND_TEXTURE_FORMAT_DXT5 0x00010f2a
+#define NXGL_BACKEND_TEXTURE_WRAP_REPEAT 0x00010101
 
 typedef float Matrix[16];
 typedef float Vector[4];
@@ -34,20 +34,20 @@ enum {
     M41, M42, M43, M44
 };
 
-typedef struct N3GpuVertex {
+typedef struct NxglBackendGpuVertex {
     float pos[3];
     float color[4];
     float tex0[3];
     float tex1[3];
-} __attribute__((packed)) N3GpuVertex;
+} __attribute__((packed)) NxglBackendGpuVertex;
 
-typedef struct N3Batch {
+typedef struct NxglBackendBatch {
     unsigned int start;
     unsigned int count;
-    N3Texture *texture;
-    N3Texture *texture1;
-    N3TextureEnvMode texture_env_mode;
-    N3Color texture_env_color;
+    NxglBackendTexture *texture;
+    NxglBackendTexture *texture1;
+    NxglBackendTextureEnvMode texture_env_mode;
+    NxglBackendColor texture_env_color;
     bool depth_test;
     bool depth_write;
     bool cull;
@@ -61,19 +61,19 @@ typedef struct N3Batch {
     int scissor_y;
     int scissor_w;
     int scissor_h;
-} N3Batch;
+} NxglBackendBatch;
 
-static N3GpuVertex *vertex_buffer;
+static NxglBackendGpuVertex *vertex_buffer;
 static unsigned int vertex_count;
-static N3Batch batches[N3_MAX_BATCHES];
+static NxglBackendBatch batches[NXGL_BACKEND_MAX_BATCHES];
 static unsigned int batch_count;
 static unsigned int submitted_vertex_count;
 static int back_width;
 static int back_height;
-static N3Texture *bound_texture;
-static N3Texture *bound_texture1;
-static N3TextureEnvMode bound_texture_env_mode = N3_TEXENV_MODULATE;
-static N3Color bound_texture_env_color = { 0.0f, 0.0f, 0.0f, 0.0f };
+static NxglBackendTexture *bound_texture;
+static NxglBackendTexture *bound_texture1;
+static NxglBackendTextureEnvMode bound_texture_env_mode = NXGL_BACKEND_TEXENV_MODULATE;
+static NxglBackendColor bound_texture_env_color = { 0.0f, 0.0f, 0.0f, 0.0f };
 static bool depth_test_enabled = true;
 static bool depth_write_enabled = true;
 static bool cull_enabled;
@@ -85,8 +85,8 @@ static uint32_t blend_dfactor = NV097_SET_BLEND_FUNC_DFACTOR_V_ONE_MINUS_SRC_ALP
 static bool scissor_enabled;
 static int scissor_x;
 static int scissor_y;
-static int scissor_w = N3_SCREEN_W;
-static int scissor_h = N3_SCREEN_H;
+static int scissor_w = NXGL_BACKEND_SCREEN_W;
+static int scissor_h = NXGL_BACKEND_SCREEN_H;
 
 extern unsigned int pb_ColorFmt;
 static bool scene_dirty;
@@ -244,7 +244,7 @@ static uint8_t color_byte(float value)
     return (uint8_t)(value * 255.0f + 0.5f);
 }
 
-static uint32_t packed_color(N3Color color)
+static uint32_t packed_color(NxglBackendColor color)
 {
     uint8_t r = color_byte(color.r);
     uint8_t g = color_byte(color.g);
@@ -253,7 +253,7 @@ static uint32_t packed_color(N3Color color)
     return ((uint32_t)a << 24) | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
 
-static void load_texture_shader(N3TextureEnvMode mode, N3Color env_color)
+static void load_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor env_color)
 {
     uint32_t *p;
     uint32_t vs_program[] = {
@@ -281,22 +281,22 @@ static void load_texture_shader(N3TextureEnvMode mode, N3Color env_color)
     }
 
     p = pb_begin();
-    if (mode == N3_TEXENV_REPLACE) {
+    if (mode == NXGL_BACKEND_TEXENV_REPLACE) {
         #include "nxgl_tex_replace_ps.inl"
-    } else if (mode == N3_TEXENV_DECAL) {
+    } else if (mode == NXGL_BACKEND_TEXENV_DECAL) {
         #include "nxgl_tex_decal_ps.inl"
-    } else if (mode == N3_TEXENV_BLEND) {
+    } else if (mode == NXGL_BACKEND_TEXENV_BLEND) {
         uint32_t factor = packed_color(env_color);
         p = pb_push1(p, NV097_SET_COMBINER_FACTOR0, factor);
         p = pb_push1(p, NV097_SET_COMBINER_FACTOR1, factor);
         #include "nxgl_tex_blend_ps.inl"
-    } else if (mode == N3_TEXENV_ADD) {
+    } else if (mode == NXGL_BACKEND_TEXENV_ADD) {
         #include "nxgl_tex_add_ps.inl"
-    } else if (mode == N3_TEXENV_SUBTRACT) {
+    } else if (mode == NXGL_BACKEND_TEXENV_SUBTRACT) {
         #include "nxgl_tex_subtract_ps.inl"
-    } else if (mode == N3_TEXENV_ADD_SIGNED) {
+    } else if (mode == NXGL_BACKEND_TEXENV_ADD_SIGNED) {
         #include "nxgl_tex_add_signed_ps.inl"
-    } else if (mode == N3_TEXENV_INTERPOLATE) {
+    } else if (mode == NXGL_BACKEND_TEXENV_INTERPOLATE) {
         uint32_t factor = packed_color(env_color);
         p = pb_push1(p, NV097_SET_COMBINER_FACTOR0, factor);
         p = pb_push1(p, NV097_SET_COMBINER_FACTOR1, factor);
@@ -438,10 +438,10 @@ static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
     pb_end(p);
 }
 
-static void setup_texture_stage(N3Texture *texture)
+static void setup_texture_stage(NxglBackendTexture *texture)
 {
     uint32_t *p = pb_begin();
-    uint32_t format = texture->format != 0 ? texture->format : N3_TEXTURE_FORMAT_RGBA;
+    uint32_t format = texture->format != 0 ? texture->format : NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
     if (texture->cube_map) {
         format |= NV097_SET_TEXTURE_FORMAT_CUBEMAP_ENABLE;
     }
@@ -449,36 +449,36 @@ static void setup_texture_stage(N3Texture *texture)
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(0), texture->depth);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(0), texture->pitch << 16);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_SIZE(0), (texture->width << 16) | texture->height);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(0), N3_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(0), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(0), 0x4003ffc0);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(0), 0x04074000);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(1), 0x0003ffc0);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(2), 0x0003ffc0);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(3), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), N3_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), N3_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), N3_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(1), 0x02022000);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(2), 0x02022000);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(3), 0x02022000);
     pb_end(p);
 }
 
-static void setup_texture_stage1(N3Texture *texture)
+static void setup_texture_stage1(NxglBackendTexture *texture)
 {
     uint32_t *p = pb_begin();
-    uint32_t format = texture->format != 0 ? texture->format : N3_TEXTURE_FORMAT_RGBA;
+    uint32_t format = texture->format != 0 ? texture->format : NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
     p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(1), (uint32_t)texture->addr & 0x03ffffff, format);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(1), texture->depth);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(1), texture->pitch << 16);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_SIZE(1), (texture->width << 16) | texture->height);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), N3_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(1), 0x4003ffc0);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(1), 0x04074000);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(2), 0x0003ffc0);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(3), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), N3_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), N3_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(2), 0x02022000);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(3), 0x02022000);
     pb_end(p);
@@ -533,7 +533,7 @@ static void draw_arrays_range(unsigned int start, unsigned int count)
 
 static void ensure_batch(void)
 {
-    N3Batch *last;
+    NxglBackendBatch *last;
 
     if (batch_count > 0) {
         last = &batches[batch_count - 1];
@@ -561,7 +561,7 @@ static void ensure_batch(void)
         }
     }
 
-    if (batch_count >= N3_MAX_BATCHES) {
+    if (batch_count >= NXGL_BACKEND_MAX_BATCHES) {
         return;
     }
 
@@ -587,20 +587,20 @@ static void ensure_batch(void)
     last->scissor_h = scissor_h;
 }
 
-static float n3_texel_coord(float coord, uint16_t size)
+static float nxgl_backend_texel_coord(float coord, uint16_t size)
 {
     return coord * (float)size;
 }
 
-static void push_vertex(N3Vertex src)
+static void push_vertex(NxglBackendVertex src)
 {
-    if (vertex_count >= N3_MAX_VERTICES) {
+    if (vertex_count >= NXGL_BACKEND_MAX_VERTICES) {
         return;
     }
 
     scene_dirty = true;
     ensure_batch();
-    N3GpuVertex *dst = &vertex_buffer[vertex_count++];
+    NxglBackendGpuVertex *dst = &vertex_buffer[vertex_count++];
     dst->pos[0] = src.pos.x;
     dst->pos[1] = src.pos.y;
     dst->pos[2] = src.pos.z;
@@ -608,19 +608,19 @@ static void push_vertex(N3Vertex src)
     dst->color[1] = src.color.g;
     dst->color[2] = src.color.b;
     dst->color[3] = src.color.a;
-    if (bound_texture != NULL && !bound_texture->cube_map && bound_texture->format == N3_TEXTURE_FORMAT_RGBA) {
-        dst->tex0[0] = n3_texel_coord(src.u, bound_texture->width);
-        dst->tex0[1] = n3_texel_coord(src.v, bound_texture->height);
-        dst->tex0[2] = n3_texel_coord(src.r, bound_texture->depth);
+    if (bound_texture != NULL && !bound_texture->cube_map && bound_texture->format == NXGL_BACKEND_TEXTURE_FORMAT_RGBA) {
+        dst->tex0[0] = nxgl_backend_texel_coord(src.u, bound_texture->width);
+        dst->tex0[1] = nxgl_backend_texel_coord(src.v, bound_texture->height);
+        dst->tex0[2] = nxgl_backend_texel_coord(src.r, bound_texture->depth);
     } else {
         dst->tex0[0] = src.u;
         dst->tex0[1] = src.v;
         dst->tex0[2] = src.r;
     }
-    if (bound_texture1 != NULL && !bound_texture1->cube_map && bound_texture1->format == N3_TEXTURE_FORMAT_RGBA) {
-        dst->tex1[0] = n3_texel_coord(src.u1, bound_texture1->width);
-        dst->tex1[1] = n3_texel_coord(src.v1, bound_texture1->height);
-        dst->tex1[2] = n3_texel_coord(src.r1, bound_texture1->depth);
+    if (bound_texture1 != NULL && !bound_texture1->cube_map && bound_texture1->format == NXGL_BACKEND_TEXTURE_FORMAT_RGBA) {
+        dst->tex1[0] = nxgl_backend_texel_coord(src.u1, bound_texture1->width);
+        dst->tex1[1] = nxgl_backend_texel_coord(src.v1, bound_texture1->height);
+        dst->tex1[2] = nxgl_backend_texel_coord(src.r1, bound_texture1->depth);
     } else {
         dst->tex1[0] = src.u1;
         dst->tex1[1] = src.v1;
@@ -631,9 +631,9 @@ static void push_vertex(N3Vertex src)
     }
 }
 
-int n3_init(void)
+int nxgl_backend_init(void)
 {
-    XVideoSetMode(N3_SCREEN_W, N3_SCREEN_H, 32, REFRESH_DEFAULT);
+    XVideoSetMode(NXGL_BACKEND_SCREEN_W, NXGL_BACKEND_SCREEN_H, 32, REFRESH_DEFAULT);
     int status = pb_init();
     if (status != 0) {
         debugPrint("pb_init Error %d\n", status);
@@ -645,7 +645,7 @@ int n3_init(void)
     back_height = pb_back_buffer_height();
     load_color_shader();
 
-    vertex_buffer = MmAllocateContiguousMemoryEx(sizeof(N3GpuVertex) * N3_MAX_VERTICES, 0, N3_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    vertex_buffer = MmAllocateContiguousMemoryEx(sizeof(NxglBackendGpuVertex) * NXGL_BACKEND_MAX_VERTICES, 0, NXGL_BACKEND_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (vertex_buffer == NULL) {
         debugPrint("nxgl_backend vertex allocation failed\n");
         return 1;
@@ -653,8 +653,8 @@ int n3_init(void)
 
     bound_texture = NULL;
     bound_texture1 = NULL;
-    bound_texture_env_mode = N3_TEXENV_MODULATE;
-    bound_texture_env_color = (N3Color){ 0.0f, 0.0f, 0.0f, 0.0f };
+    bound_texture_env_mode = NXGL_BACKEND_TEXENV_MODULATE;
+    bound_texture_env_color = (NxglBackendColor){ 0.0f, 0.0f, 0.0f, 0.0f };
     scissor_enabled = false;
     scissor_x = 0;
     scissor_y = 0;
@@ -664,7 +664,7 @@ int n3_init(void)
     return 0;
 }
 
-void n3_shutdown(void)
+void nxgl_backend_shutdown(void)
 {
     if (vertex_buffer != NULL) {
         MmFreeContiguousMemory(vertex_buffer);
@@ -674,7 +674,7 @@ void n3_shutdown(void)
     pb_kill();
 }
 
-static bool n3_clip_clear_rect(int *x, int *y, int *width, int *height)
+static bool nxgl_backend_clip_clear_rect(int *x, int *y, int *width, int *height)
 {
     int x1 = *x;
     int y1 = *y;
@@ -695,7 +695,7 @@ static bool n3_clip_clear_rect(int *x, int *y, int *width, int *height)
     return true;
 }
 
-static uint32_t n3_convert_clear_color(uint32_t color)
+static uint32_t nxgl_backend_convert_clear_color(uint32_t color)
 {
     switch (pb_ColorFmt) {
     case NV097_SET_SURFACE_FORMAT_COLOR_LE_X1R5G5B5_Z1R5G5B5:
@@ -709,7 +709,7 @@ static uint32_t n3_convert_clear_color(uint32_t color)
     }
 }
 
-void n3_begin_frame(bool blend)
+void nxgl_backend_begin_frame(bool blend)
 {
     vertex_count = 0;
     batch_count = 0;
@@ -737,16 +737,16 @@ void n3_begin_frame(bool blend)
     pb_erase_text_screen();
     bound_texture = NULL;
     bound_texture1 = NULL;
-    bound_texture_env_mode = N3_TEXENV_MODULATE;
-    bound_texture_env_color = (N3Color){ 0.0f, 0.0f, 0.0f, 0.0f };
+    bound_texture_env_mode = NXGL_BACKEND_TEXENV_MODULATE;
+    bound_texture_env_color = (NxglBackendColor){ 0.0f, 0.0f, 0.0f, 0.0f };
 }
 
-void n3_clear_color(uint32_t clear_color, bool red, bool green, bool blue, bool alpha, int x, int y, int width, int height)
+void nxgl_backend_clear_color(uint32_t clear_color, bool red, bool green, bool blue, bool alpha, int x, int y, int width, int height)
 {
     uint32_t trigger = 0;
     uint32_t *p;
 
-    if (!n3_clip_clear_rect(&x, &y, &width, &height)) {
+    if (!nxgl_backend_clip_clear_rect(&x, &y, &width, &height)) {
         return;
     }
     if (red) trigger |= NV097_CLEAR_SURFACE_R;
@@ -763,12 +763,12 @@ void n3_clear_color(uint32_t clear_color, bool red, bool green, bool blue, bool 
     *(p++) = ((y + height - 1) << 16) | y;
     pb_push(p++, NV20_TCL_PRIMITIVE_3D_CLEAR_VALUE_DEPTH, 3);
     *(p++) = 0;
-    *(p++) = n3_convert_clear_color(clear_color);
+    *(p++) = nxgl_backend_convert_clear_color(clear_color);
     *(p++) = trigger;
     pb_end(p);
 }
 
-void n3_clear_depth_stencil(bool depth, float depth_value, bool stencil, uint8_t stencil_value, int x, int y, int width, int height)
+void nxgl_backend_clear_depth_stencil(bool depth, float depth_value, bool stencil, uint8_t stencil_value, int x, int y, int width, int height)
 {
     uint32_t clear_depth;
     uint32_t trigger = 0;
@@ -777,7 +777,7 @@ void n3_clear_depth_stencil(bool depth, float depth_value, bool stencil, uint8_t
     if (!depth && !stencil) {
         return;
     }
-    if (!n3_clip_clear_rect(&x, &y, &width, &height)) {
+    if (!nxgl_backend_clip_clear_rect(&x, &y, &width, &height)) {
         return;
     }
     if (depth_value < 0.0f) depth_value = 0.0f;
@@ -801,37 +801,37 @@ void n3_clear_depth_stencil(bool depth, float depth_value, bool stencil, uint8_t
     pb_end(p);
 }
 
-void n3_begin(uint32_t clear_color, bool blend)
+void nxgl_backend_begin(uint32_t clear_color, bool blend)
 {
-    n3_begin_frame(blend);
+    nxgl_backend_begin_frame(blend);
     pb_erase_depth_stencil_buffer(0, 0, back_width, back_height);
-    n3_clear_color(clear_color, true, true, true, true, 0, 0, back_width, back_height);
+    nxgl_backend_clear_color(clear_color, true, true, true, true, 0, 0, back_width, back_height);
 }
 
-void n3_set_depth(bool test, bool write)
+void nxgl_backend_set_depth(bool test, bool write)
 {
     depth_test_enabled = test;
     depth_write_enabled = write;
 }
 
-void n3_set_cull(bool enabled)
+void nxgl_backend_set_cull(bool enabled)
 {
     cull_enabled = enabled;
 }
 
-void n3_set_cull_mode(uint32_t face, uint32_t front_face)
+void nxgl_backend_set_cull_mode(uint32_t face, uint32_t front_face)
 {
     cull_face_mode = face;
     front_face_mode = front_face;
 }
 
-void n3_set_blend_func(uint32_t sfactor, uint32_t dfactor)
+void nxgl_backend_set_blend_func(uint32_t sfactor, uint32_t dfactor)
 {
     blend_sfactor = sfactor;
     blend_dfactor = dfactor;
 }
 
-void n3_set_scissor(bool enabled, int x, int y, int width, int height)
+void nxgl_backend_set_scissor(bool enabled, int x, int y, int width, int height)
 {
     scissor_enabled = enabled;
     scissor_x = x;
@@ -840,7 +840,7 @@ void n3_set_scissor(bool enabled, int x, int y, int width, int height)
     scissor_h = height;
 }
 
-void n3_set_projection(float fov_y_degrees, float near_z, float far_z)
+void nxgl_backend_set_projection(float fov_y_degrees, float near_z, float far_z)
 {
     if (fov_y_degrees > 1.0f && fov_y_degrees < 179.0f) {
         projection_fov_y_degrees = fov_y_degrees;
@@ -851,7 +851,7 @@ void n3_set_projection(float fov_y_degrees, float near_z, float far_z)
     }
 }
 
-void n3_set_camera(float x, float y, float z, float rx, float ry, float rz)
+void nxgl_backend_set_camera(float x, float y, float z, float rx, float ry, float rz)
 {
     camera_pos[0] = x;
     camera_pos[1] = y;
@@ -861,20 +861,20 @@ void n3_set_camera(float x, float y, float z, float rx, float ry, float rz)
     camera_rot[2] = rz;
 }
 
-void n3_push_triangle(N3Vertex a, N3Vertex b, N3Vertex c)
+void nxgl_backend_push_triangle(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c)
 {
     push_vertex(a);
     push_vertex(b);
     push_vertex(c);
 }
 
-void n3_push_quad(N3Vertex a, N3Vertex b, N3Vertex c, N3Vertex d)
+void nxgl_backend_push_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d)
 {
-    n3_push_triangle(a, b, c);
-    n3_push_triangle(a, c, d);
+    nxgl_backend_push_triangle(a, b, c);
+    nxgl_backend_push_triangle(a, c, d);
 }
 
-int n3_texture_create_rgba(N3Texture *texture, uint16_t width, uint16_t height, const uint8_t *rgba)
+int nxgl_backend_texture_create_rgba(NxglBackendTexture *texture, uint16_t width, uint16_t height, const uint8_t *rgba)
 {
     if (texture == NULL || width == 0 || height == 0 || rgba == NULL) {
         return 1;
@@ -887,10 +887,10 @@ int n3_texture_create_rgba(N3Texture *texture, uint16_t width, uint16_t height, 
     texture->height = native_height;
     texture->depth = 1;
     texture->pitch = native_width * 4;
-    texture->format = N3_TEXTURE_FORMAT_RGBA;
+    texture->format = NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
     texture->cube_map = false;
     texture->volume = false;
-    texture->addr = MmAllocateContiguousMemoryEx(texture->pitch * texture->height, 0, N3_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    texture->addr = MmAllocateContiguousMemoryEx(texture->pitch * texture->height, 0, NXGL_BACKEND_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (texture->addr == NULL) {
         return 1;
     }
@@ -912,7 +912,7 @@ int n3_texture_create_rgba(N3Texture *texture, uint16_t width, uint16_t height, 
     return 0;
 }
 
-int n3_texture_create_rgba3d(N3Texture *texture, uint16_t width, uint16_t height, uint16_t depth, const uint8_t *rgba)
+int nxgl_backend_texture_create_rgba3d(NxglBackendTexture *texture, uint16_t width, uint16_t height, uint16_t depth, const uint8_t *rgba)
 {
     size_t size;
     uint32_t *pixels;
@@ -924,12 +924,12 @@ int n3_texture_create_rgba3d(N3Texture *texture, uint16_t width, uint16_t height
     texture->height = height;
     texture->depth = depth;
     texture->pitch = width * 4;
-    texture->format = N3_TEXTURE_FORMAT_RGBA3D;
+    texture->format = NXGL_BACKEND_TEXTURE_FORMAT_RGBA3D;
     texture->cube_map = false;
     texture->volume = true;
 
     size = (size_t)texture->pitch * (size_t)texture->height * (size_t)texture->depth;
-    texture->addr = MmAllocateContiguousMemoryEx(size, 0, N3_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    texture->addr = MmAllocateContiguousMemoryEx(size, 0, NXGL_BACKEND_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (texture->addr == NULL) {
         return -1;
     }
@@ -944,7 +944,7 @@ int n3_texture_create_rgba3d(N3Texture *texture, uint16_t width, uint16_t height
     return 0;
 }
 
-int n3_texture_create_cube_rgba(N3Texture *texture, uint16_t size, const uint8_t *faces[6])
+int nxgl_backend_texture_create_cube_rgba(NxglBackendTexture *texture, uint16_t size, const uint8_t *faces[6])
 {
     if (texture == NULL || size == 0 || faces == NULL) {
         return 1;
@@ -959,12 +959,12 @@ int n3_texture_create_cube_rgba(N3Texture *texture, uint16_t size, const uint8_t
     texture->height = size;
     texture->depth = 6;
     texture->pitch = size * 4;
-    texture->format = N3_TEXTURE_FORMAT_RGBA;
+    texture->format = NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
     texture->cube_map = true;
     texture->volume = false;
     texture->addr = MmAllocateContiguousMemoryEx((size_t)texture->pitch * (size_t)texture->height * 6u,
                                                  0,
-                                                 N3_MAXRAM,
+                                                 NXGL_BACKEND_MAXRAM,
                                                  0,
                                                  PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (texture->addr == NULL) {
@@ -987,7 +987,7 @@ int n3_texture_create_cube_rgba(N3Texture *texture, uint16_t size, const uint8_t
     return 0;
 }
 
-int n3_texture_create_compressed(N3Texture *texture, uint16_t width, uint16_t height, N3CompressedTextureFormat format, const uint8_t *data, uint32_t data_size)
+int nxgl_backend_texture_create_compressed(NxglBackendTexture *texture, uint16_t width, uint16_t height, NxglBackendCompressedTextureFormat format, const uint8_t *data, uint32_t data_size)
 {
     uint32_t native_format;
     uint16_t pitch;
@@ -997,14 +997,14 @@ int n3_texture_create_compressed(N3Texture *texture, uint16_t width, uint16_t he
         return 1;
     }
 
-    if (format == N3_COMPRESSED_DXT1) {
-        native_format = N3_TEXTURE_FORMAT_DXT1;
+    if (format == NXGL_BACKEND_COMPRESSED_DXT1) {
+        native_format = NXGL_BACKEND_TEXTURE_FORMAT_DXT1;
         block_size = 8;
-    } else if (format == N3_COMPRESSED_DXT3) {
-        native_format = N3_TEXTURE_FORMAT_DXT3;
+    } else if (format == NXGL_BACKEND_COMPRESSED_DXT3) {
+        native_format = NXGL_BACKEND_TEXTURE_FORMAT_DXT3;
         block_size = 16;
-    } else if (format == N3_COMPRESSED_DXT5) {
-        native_format = N3_TEXTURE_FORMAT_DXT5;
+    } else if (format == NXGL_BACKEND_COMPRESSED_DXT5) {
+        native_format = NXGL_BACKEND_TEXTURE_FORMAT_DXT5;
         block_size = 16;
     } else {
         return 1;
@@ -1018,7 +1018,7 @@ int n3_texture_create_compressed(N3Texture *texture, uint16_t width, uint16_t he
     texture->format = native_format;
     texture->cube_map = false;
     texture->volume = false;
-    texture->addr = MmAllocateContiguousMemoryEx(data_size, 0, N3_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
+    texture->addr = MmAllocateContiguousMemoryEx(data_size, 0, NXGL_BACKEND_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (texture->addr == NULL) {
         return 1;
     }
@@ -1026,7 +1026,7 @@ int n3_texture_create_compressed(N3Texture *texture, uint16_t width, uint16_t he
     return 0;
 }
 
-void n3_texture_destroy(N3Texture *texture)
+void nxgl_backend_texture_destroy(NxglBackendTexture *texture)
 {
     if (texture != NULL && texture->addr != NULL) {
         MmFreeContiguousMemory(texture->addr);
@@ -1043,23 +1043,23 @@ void n3_texture_destroy(N3Texture *texture)
     }
 }
 
-void n3_bind_texture(N3Texture *texture)
+void nxgl_backend_bind_texture(NxglBackendTexture *texture)
 {
     bound_texture = texture;
 }
 
-void n3_bind_texture1(N3Texture *texture)
+void nxgl_backend_bind_texture1(NxglBackendTexture *texture)
 {
     bound_texture1 = texture;
 }
 
-void n3_set_texture_env(N3TextureEnvMode mode, N3Color color)
+void nxgl_backend_set_texture_env(NxglBackendTextureEnvMode mode, NxglBackendColor color)
 {
     bound_texture_env_mode = mode;
     bound_texture_env_color = color;
 }
 
-void n3_flush(void)
+void nxgl_backend_flush(void)
 {
     if (!scene_dirty || vertex_count == 0 || batch_count == 0) {
         return;
@@ -1094,7 +1094,7 @@ void n3_flush(void)
     pb_end(p);
 
     for (unsigned int i = 0; i < batch_count; ++i) {
-        N3Batch *batch = &batches[i];
+        NxglBackendBatch *batch = &batches[i];
         bool textured = batch->texture != NULL && batch->texture->addr != NULL;
         bool cube_textured = textured && batch->texture->cube_map;
         bool volume_textured = textured && batch->texture->volume;
@@ -1124,13 +1124,13 @@ void n3_flush(void)
         }
 
         set_attrib_pointer(0, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(N3GpuVertex), &vertex_buffer[0].pos[0]);
+                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].pos[0]);
         set_attrib_pointer(3, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           4, sizeof(N3GpuVertex), &vertex_buffer[0].color[0]);
+                           4, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].color[0]);
         set_attrib_pointer(9, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(N3GpuVertex), &vertex_buffer[0].tex0[0]);
+                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex0[0]);
         set_attrib_pointer(10, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(N3GpuVertex), &vertex_buffer[0].tex1[0]);
+                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex1[0]);
 
         draw_arrays_range(batch->start, batch->count);
     }
@@ -1144,19 +1144,19 @@ void n3_flush(void)
     scene_dirty = false;
 }
 
-int n3_back_buffer_width(void)
+int nxgl_backend_back_buffer_width(void)
 {
     return back_width;
 }
 
-int n3_back_buffer_height(void)
+int nxgl_backend_back_buffer_height(void)
 {
     return back_height;
 }
 
-void n3_finish(const char *title, const char *detail)
+void nxgl_backend_finish(const char *title, const char *detail)
 {
-    n3_flush();
+    nxgl_backend_flush();
 
     if (title != NULL) {
         pb_print("%s\n", title);
