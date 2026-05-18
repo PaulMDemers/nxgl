@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static bool results[12];
+static bool results[13];
 
 static bool consume_error(GLenum expected)
 {
@@ -285,6 +285,17 @@ static void run_probe(void)
     glGetFloatv(GL_TEXTURE_MATRIX, tx);
     ok = nearf(tx[12], 0.0f) && nearf(tx[13], 0.0f) && consume_error(GL_NO_ERROR);
     expect_bool("texture stack restore", ok, 11);
+
+    reset_state();
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    glRotatef(120.0f, 1.0f, 1.0f, 1.0f);
+    glGetFloatv(GL_MODELVIEW_MATRIX, mv);
+    ok = nearf(mv[0], 0.0f) && nearf(mv[1], 1.0f) && nearf(mv[2], 0.0f) &&
+         nearf(mv[4], 0.0f) && nearf(mv[5], 0.0f) && nearf(mv[6], 1.0f) &&
+         nearf(mv[8], 1.0f) && nearf(mv[9], 0.0f) && nearf(mv[10], 0.0f) &&
+         consume_error(GL_NO_ERROR);
+    expect_bool("arbitrary axis rotation matrix", ok, 12);
 }
 
 static void draw_bar(float x, bool pass)
@@ -304,7 +315,7 @@ static void draw_bar(float x, bool pass)
 
 static bool all_passed(void)
 {
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < 13; ++i) {
         if (!results[i]) return false;
     }
     return true;
@@ -327,8 +338,8 @@ int main(void)
         reset_state();
         glClearColor(0.02f, 0.02f, 0.04f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        for (int i = 0; i < 12; ++i) {
-            draw_bar(-2.75f + (float)i * 0.48f, results[i]);
+        for (int i = 0; i < 13; ++i) {
+            draw_bar(-2.95f + (float)i * 0.46f, results[i]);
         }
         nxglSwapBuffers("NXGL matrix stack edge", all_passed() ? "all checks passed" : "matrix stack edge check failed");
         Sleep(16);

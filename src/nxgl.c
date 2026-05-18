@@ -2974,7 +2974,7 @@ static void update_projected_position_from_clip(NxglBackendVertex *vertex)
     GLfloat ndc_x;
     GLfloat ndc_y;
     GLfloat ndc_z;
-    GLfloat native_z = 5.2f;
+    GLfloat native_z;
 
     if (!projected_path_active() || fabsf(vertex->clip_w) < 0.000001f) {
         return;
@@ -2984,10 +2984,11 @@ static void update_projected_position_from_clip(NxglBackendVertex *vertex)
     ndc_x = vertex->clip_x * inv_w;
     ndc_y = vertex->clip_y * inv_w;
     ndc_z = vertex->clip_z * inv_w;
+    vertex->window_z = map_depth_range(clamp01(ndc_z * 0.5f + 0.5f));
+    native_z = 5.2f + vertex->window_z * 2.0f;
     vertex->pos.x = ndc_x * native_z - camera_x;
     vertex->pos.y = ndc_y * native_z - camera_y;
     vertex->pos.z = -camera_z - native_z;
-    vertex->window_z = map_depth_range(clamp01(ndc_z * 0.5f + 0.5f));
 }
 
 static NxglBackendVec3 transform_vertex(float x, float y, float z)
@@ -7675,21 +7676,26 @@ void glRotatef(float angle_degrees, float x, float y, float z)
     float radians = angle_degrees * 0.017453292519943295f;
     matrix_identity(r);
 
-    if (x != 0.0f) {
-        r[M22] = cosf(radians);
-        r[M23] = sinf(radians);
-        r[M32] = -sinf(radians);
-        r[M33] = cosf(radians);
-    } else if (y != 0.0f) {
-        r[M11] = cosf(radians);
-        r[M13] = -sinf(radians);
-        r[M31] = sinf(radians);
-        r[M33] = cosf(radians);
-    } else if (z != 0.0f) {
-        r[M11] = cosf(radians);
-        r[M12] = sinf(radians);
-        r[M21] = -sinf(radians);
-        r[M22] = cosf(radians);
+    float axis_len = sqrtf(x * x + y * y + z * z);
+    if (axis_len > 0.0f) {
+        float inv_axis_len = 1.0f / axis_len;
+        float s = sinf(radians);
+        float c = cosf(radians);
+        float one_minus_c = 1.0f - c;
+
+        x *= inv_axis_len;
+        y *= inv_axis_len;
+        z *= inv_axis_len;
+
+        r[M11] = x * x * one_minus_c + c;
+        r[M12] = x * y * one_minus_c + z * s;
+        r[M13] = x * z * one_minus_c - y * s;
+        r[M21] = x * y * one_minus_c - z * s;
+        r[M22] = y * y * one_minus_c + c;
+        r[M23] = y * z * one_minus_c + x * s;
+        r[M31] = x * z * one_minus_c + y * s;
+        r[M32] = y * z * one_minus_c - x * s;
+        r[M33] = z * z * one_minus_c + c;
     }
 
     premult_current_matrix(r);
