@@ -565,6 +565,7 @@ typedef void GLvoid;
 int nxglInit(void);
 void nxglShutdown(void);
 void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz);
+void nxglSetReadbackEnabled(GLboolean enabled);
 void nxglSwapBuffers(const char *title, const char *detail);
 
 const GLubyte *glGetString(GLenum name);

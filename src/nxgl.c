@@ -546,6 +546,7 @@ static GLboolean unpack_lsb_first;
 static uint32_t *shadow_color_buffer;
 static float *shadow_depth_buffer;
 static uint8_t *shadow_stencil_buffer;
+static bool shadow_readback_enabled = true;
 static float *accum_buffer;
 static bool native_frame_started;
 static GLfloat accum_clear_value[4];
@@ -627,6 +628,8 @@ static bool point_inside_clip_planes(NxglBackendVec3 pos);
 static bool primitive_rejected_by_clip_planes(const NxglBackendVertex *vertices, int count);
 static GLfloat feedback_clip_plane_value(const NxglBackendVertex *vertex, int plane);
 static void normalize_lower_feedback_clip_edges(NxglBackendVertex *vertices, int count);
+static bool clip_planes_enabled(void);
+static bool native_fast_fill_enabled(void);
 static void shadow_fill_bounds(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d, bool quad, bool line);
 static int mip_chain_end_level(GLsizei width, GLsizei height, GLsizei depth, GLint base_level, GLint max_level);
 static bool texture_levels_complete(const TextureObject *texture, const TextureLevel *levels);
@@ -2818,6 +2821,24 @@ static bool primitive_rejected_by_clip_planes(const NxglBackendVertex *vertices,
     return false;
 }
 
+static bool clip_planes_enabled(void)
+{
+    for (int i = 0; i < NXGL_MAX_CLIP_PLANES; ++i) {
+        if (clip_planes[i].enabled) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool native_fast_fill_enabled(void)
+{
+    return !shadow_readback_enabled &&
+           render_mode == GL_RENDER &&
+           polygon_mode == GL_FILL &&
+           !clip_planes_enabled();
+}
+
 static bool default_combine_sources(int unit)
 {
     return texture_source_rgb[unit][0] == GL_TEXTURE &&
@@ -4088,6 +4109,11 @@ static void emit_triangle_vertices(NxglBackendVertex a, NxglBackendVertex b, Nxg
         vertices[0].color = vertices[2].color;
         vertices[1].color = vertices[2].color;
     }
+    if (native_fast_fill_enabled()) {
+        ensure_native_frame_started();
+        nxgl_backend_push_triangle(vertices[0], vertices[1], vertices[2]);
+        return;
+    }
     if (primitive_rejected_by_clip_planes(vertices, 3)) {
         return;
     }
@@ -4129,6 +4155,11 @@ static void emit_quad_vertices(NxglBackendVertex a, NxglBackendVertex b, NxglBac
         vertices[0].color = vertices[3].color;
         vertices[1].color = vertices[3].color;
         vertices[2].color = vertices[3].color;
+    }
+    if (native_fast_fill_enabled()) {
+        ensure_native_frame_started();
+        nxgl_backend_push_quad(vertices[0], vertices[1], vertices[2], vertices[3]);
+        return;
     }
     if (primitive_rejected_by_clip_planes(vertices, 4)) {
         return;
@@ -4504,7 +4535,7 @@ static bool shadow_clear_bounds(int *min_x, int *min_y, int *max_x, int *max_y)
 static void shadow_clear(uint32_t color)
 {
     int min_x, min_y, max_x, max_y;
-    if (shadow_color_buffer == NULL) {
+    if (!shadow_readback_enabled || shadow_color_buffer == NULL) {
         return;
     }
     if (!shadow_clear_bounds(&min_x, &min_y, &max_x, &max_y)) {
@@ -4522,7 +4553,7 @@ static void shadow_clear_depth(GLfloat depth)
 {
     int min_x, min_y, max_x, max_y;
 
-    if (shadow_depth_buffer == NULL || !depth_write_enabled) {
+    if (!shadow_readback_enabled || shadow_depth_buffer == NULL || !depth_write_enabled) {
         return;
     }
     if (!shadow_clear_bounds(&min_x, &min_y, &max_x, &max_y)) {
@@ -4540,7 +4571,7 @@ static void shadow_clear_stencil(uint8_t stencil)
 {
     int min_x, min_y, max_x, max_y;
     uint8_t mask = (uint8_t)(stencil_write_mask & 0xffu);
-    if (shadow_stencil_buffer == NULL) {
+    if (!shadow_readback_enabled || shadow_stencil_buffer == NULL) {
         return;
     }
     if (!shadow_clear_bounds(&min_x, &min_y, &max_x, &max_y) || mask == 0u) {
@@ -5553,6 +5584,10 @@ static void shadow_fill_bounds(NxglBackendVertex a, NxglBackendVertex b, NxglBac
     NxglBackendVertex vertices[4] = { a, b, c, d };
     bool cube_shadow = cube_texture_enabled_for_shadow();
 
+    if (!shadow_readback_enabled) {
+        return;
+    }
+
     if (quad) {
         base_color = (NxglBackendColor){
             (a.color.r + b.color.r + c.color.r + d.color.r) * 0.25f,
@@ -5887,6 +5922,7 @@ int nxglInit(void)
     current_raster_position[3] = 1.0f;
     current_raster_position_valid = true;
     render_mode = GL_RENDER;
+    shadow_readback_enabled = true;
     selection_buffer = NULL;
     selection_buffer_size = 0;
     selection_write_count = 0;
@@ -6000,6 +6036,20 @@ void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz)
     camera_y = y;
     camera_z = z;
     nxgl_backend_set_camera(x, y, z, rx, ry, rz);
+}
+
+void nxglSetReadbackEnabled(GLboolean enabled)
+{
+    bool next = enabled != GL_FALSE;
+    if (shadow_readback_enabled == next) {
+        return;
+    }
+    shadow_readback_enabled = next;
+    if (shadow_readback_enabled) {
+        shadow_clear(clear_color);
+        shadow_clear_depth(depth_clear_value);
+        shadow_clear_stencil((uint8_t)(stencil_clear_value & 0xff));
+    }
 }
 
 void nxglSwapBuffers(const char *title, const char *detail)
@@ -7277,6 +7327,10 @@ void glAccum(GLenum op, GLfloat value)
     }
     if (op != GL_ACCUM && op != GL_LOAD && op != GL_RETURN && op != GL_MULT && op != GL_ADD) {
         set_error(GL_INVALID_ENUM);
+        return;
+    }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
         return;
     }
     if (shadow_color_buffer == NULL || !ensure_accum_buffer()) {
@@ -10187,6 +10241,10 @@ void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format
         set_error(GL_INVALID_VALUE);
         return;
     }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
+        return;
+    }
     if ((color_read && shadow_color_buffer == NULL) ||
         (depth_read && shadow_depth_buffer == NULL) ||
         (stencil_read && shadow_stencil_buffer == NULL)) {
@@ -10494,6 +10552,10 @@ void glBitmap(GLsizei width, GLsizei height, GLfloat xorig, GLfloat yorig, GLflo
         set_error(GL_INVALID_VALUE);
         return;
     }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
+        return;
+    }
     if (shadow_color_buffer == NULL) {
         set_error(GL_INVALID_OPERATION);
         return;
@@ -10582,6 +10644,10 @@ void glDrawPixels(GLsizei width, GLsizei height, GLenum format, GLenum type, con
     }
     if (pixels == NULL) {
         set_error(GL_INVALID_VALUE);
+        return;
+    }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
         return;
     }
     if ((color_draw && shadow_color_buffer == NULL) ||
@@ -10693,6 +10759,10 @@ void glCopyPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum type)
     }
     if (width < 0 || height < 0) {
         set_error(GL_INVALID_VALUE);
+        return;
+    }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
         return;
     }
     if ((color_copy && shadow_color_buffer == NULL) ||

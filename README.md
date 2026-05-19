@@ -48,6 +48,19 @@ Then include the API from application code:
 #include "nxgl.h"
 ```
 
+For render-only applications that do not call `glReadPixels`, pixel transfer,
+or accumulation APIs, disable the CPU readback shadow after `nxglInit()`:
+
+```c
+nxglSetReadbackEnabled(GL_FALSE);
+```
+
+Readback is enabled by default for compatibility and for the validation probes.
+With readback disabled, filled triangle and quad primitives can take a native
+fast path, while readback-dependent APIs such as `glReadPixels`,
+`glDrawPixels`, `glCopyPixels`, `glBitmap`, and `glAccum` report
+`GL_INVALID_OPERATION`.
+
 ## Documentation
 
 - [`docs/BUILDING.md`](docs/BUILDING.md): build environment and smoke checks.
