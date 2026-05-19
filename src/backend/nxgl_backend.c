@@ -4,6 +4,7 @@
 #include <hal/video.h>
 #include <math.h>
 #include <pbkit/pbkit.h>
+#include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1161,6 +1162,18 @@ int nxgl_backend_back_buffer_height(void)
 
 void nxgl_backend_finish(const char *title, const char *detail)
 {
+#ifdef NXGL_PERF_OVERLAY
+    static DWORD perf_last_tick;
+    static DWORD perf_sample_tick;
+    static DWORD perf_total_ms;
+    static DWORD perf_min_ms = 0xffffffffu;
+    static DWORD perf_max_ms;
+    static unsigned int perf_frames;
+    static unsigned int perf_display_frames;
+    static unsigned int perf_display_avg_ms_x10;
+    static unsigned int perf_display_fps_x10;
+#endif
+
     nxgl_backend_flush();
 
     if (title != NULL) {
@@ -1169,11 +1182,61 @@ void nxgl_backend_finish(const char *title, const char *detail)
     if (detail != NULL) {
         pb_print("%s\n", detail);
     }
+#ifdef NXGL_PERF_OVERLAY
+    if (perf_display_frames == 0u) {
+        char perf_line[80];
+        snprintf(perf_line, sizeof(perf_line), "vertices=%u perf=warming", submitted_vertex_count);
+        pb_print("%s\n", perf_line);
+    } else {
+        char perf_line[80];
+        snprintf(perf_line, sizeof(perf_line), "vertices=%u perf %u.%ums %u.%ufps",
+                 submitted_vertex_count,
+                 perf_display_avg_ms_x10 / 10u,
+                 perf_display_avg_ms_x10 % 10u,
+                 perf_display_fps_x10 / 10u,
+                 perf_display_fps_x10 % 10u);
+        pb_print("%s\n", perf_line);
+    }
+#else
     pb_print("vertices=%u\n", submitted_vertex_count);
+#endif
     pb_draw_text_screen();
 
     while (pb_busy()) {
     }
     while (pb_finished()) {
     }
+#ifdef NXGL_PERF_OVERLAY
+    {
+        DWORD now = GetTickCount();
+        if (perf_last_tick == 0u) {
+            perf_last_tick = now;
+            perf_sample_tick = now;
+        } else {
+            DWORD delta = now - perf_last_tick;
+            perf_last_tick = now;
+            if (delta < 10000u) {
+                perf_total_ms += delta;
+                if (delta < perf_min_ms) {
+                    perf_min_ms = delta;
+                }
+                if (delta > perf_max_ms) {
+                    perf_max_ms = delta;
+                }
+                ++perf_frames;
+            }
+            if (now - perf_sample_tick >= 1000u && perf_frames > 0u) {
+                DWORD elapsed = now - perf_sample_tick;
+                perf_display_frames = perf_frames;
+                perf_display_avg_ms_x10 = (unsigned int)((perf_total_ms * 10u + perf_frames / 2u) / perf_frames);
+                perf_display_fps_x10 = (unsigned int)((perf_frames * 10000u + elapsed / 2u) / elapsed);
+                perf_sample_tick = now;
+                perf_total_ms = 0u;
+                perf_min_ms = 0xffffffffu;
+                perf_max_ms = 0u;
+                perf_frames = 0u;
+            }
+        }
+    }
+#endif
 }

@@ -396,10 +396,13 @@ static Matrix texture_matrix;
 static Matrix modelview_stack[32];
 static Matrix projection_stack[8];
 static Matrix texture_stack[8];
+static Matrix modelview_inverse_cache;
 static int modelview_stack_top;
 static int projection_stack_top;
 static int texture_stack_top;
 static GLenum matrix_mode = GL_MODELVIEW;
+static bool modelview_inverse_cache_valid;
+static bool modelview_inverse_cache_invertible;
 static NxglBackendColor current_color = { 1.0f, 1.0f, 1.0f, 1.0f };
 static GLfloat current_index;
 static NxglBackendVec3 current_normal = { 0.0f, 0.0f, 1.0f };
@@ -469,6 +472,7 @@ static bool texture_2d_enabled[4];
 static bool texture_3d_enabled[4];
 static bool texture_cube_map_enabled[4];
 static TexGenState texgen_state[4][4];
+static bool texgen_any_enabled;
 static GLenum active_texture = GL_TEXTURE0;
 static GLenum client_active_texture = GL_TEXTURE0;
 static TextureObject texture_objects[16];
@@ -657,6 +661,7 @@ static bool convert_to_rgba(uint8_t *dst, const uint8_t *src, GLsizei width, GLs
 static bool shadow_project(NxglBackendVec3 pos, int *sx, int *sy);
 static size_t pixel_source_data_size(GLsizei width, GLsizei height, GLenum format, GLenum type);
 static size_t bitmap_source_data_size(GLsizei width, GLsizei height);
+static void update_texgen_enabled_cache(void);
 static void sync_native_state(void);
 static void ensure_native_frame_started(void);
 static void apply_color_material(NxglBackendColor color);
@@ -934,6 +939,7 @@ static void restore_attrib_snapshot(const AttribSnapshot *snapshot)
         memcpy(texture_3d_enabled, snapshot->texture_3d_enabled, sizeof(texture_3d_enabled));
         memcpy(texture_cube_map_enabled, snapshot->texture_cube_map_enabled, sizeof(texture_cube_map_enabled));
         memcpy(texgen_state, snapshot->texgen_state, sizeof(texgen_state));
+        update_texgen_enabled_cache();
         for (int i = 0; i < NXGL_EVAL_MAP_COUNT; ++i) {
             eval_maps1[i].enabled = snapshot->eval_maps1[i].enabled;
             eval_maps2[i].enabled = snapshot->eval_maps2[i].enabled;
@@ -993,6 +999,7 @@ static void restore_attrib_snapshot(const AttribSnapshot *snapshot)
         memcpy(texture_binding_3d, snapshot->texture_binding_3d, sizeof(texture_binding_3d));
         memcpy(texture_binding_cube_map, snapshot->texture_binding_cube_map, sizeof(texture_binding_cube_map));
         memcpy(texgen_state, snapshot->texgen_state, sizeof(texgen_state));
+        update_texgen_enabled_cache();
         memcpy(texture_env_mode, snapshot->texture_env_mode, sizeof(texture_env_mode));
         memcpy(texture_env_color, snapshot->texture_env_color, sizeof(texture_env_color));
         memcpy(texture_combine_rgb, snapshot->texture_combine_rgb, sizeof(texture_combine_rgb));
@@ -1301,6 +1308,7 @@ static bool valid_texgen_mode(GLenum coord, GLenum mode)
 
 static void init_texgen_state(void)
 {
+    texgen_any_enabled = false;
     for (int unit = 0; unit < 4; ++unit) {
         for (int coord = 0; coord < 4; ++coord) {
             TexGenState *state = &texgen_state[unit][coord];
@@ -2640,6 +2648,11 @@ static Matrix *current_matrix(void)
     return &modelview;
 }
 
+static void invalidate_modelview_inverse_cache(void)
+{
+    modelview_inverse_cache_valid = false;
+}
+
 static int clip_plane_index(GLenum plane)
 {
     if (plane >= GL_CLIP_PLANE0 && plane <= GL_CLIP_PLANE5) {
@@ -2829,6 +2842,24 @@ static bool clip_planes_enabled(void)
         }
     }
     return false;
+}
+
+static bool texgen_enabled(void)
+{
+    return texgen_any_enabled;
+}
+
+static void update_texgen_enabled_cache(void)
+{
+    texgen_any_enabled = false;
+    for (int unit = 0; unit < 4; ++unit) {
+        for (int coord = 0; coord < 4; ++coord) {
+            if (texgen_state[unit][coord].enabled) {
+                texgen_any_enabled = true;
+                return;
+            }
+        }
+    }
 }
 
 static bool native_fast_fill_enabled(void)
@@ -3024,19 +3055,23 @@ static NxglBackendVec3 transform_vertex(float x, float y, float z)
 
 static NxglBackendVec3 transform_normal_to_eye(NxglBackendVec3 normal)
 {
-    Matrix inverse;
     NxglBackendVec3 out;
 
-    if (!invert_matrix(inverse, modelview)) {
+    if (!modelview_inverse_cache_valid) {
+        modelview_inverse_cache_invertible = invert_matrix(modelview_inverse_cache, modelview);
+        modelview_inverse_cache_valid = true;
+    }
+
+    if (!modelview_inverse_cache_invertible) {
         out.x = normal.x * modelview[M11] + normal.y * modelview[M21] + normal.z * modelview[M31];
         out.y = normal.x * modelview[M12] + normal.y * modelview[M22] + normal.z * modelview[M32];
         out.z = normal.x * modelview[M13] + normal.y * modelview[M23] + normal.z * modelview[M33];
         return out;
     }
 
-    out.x = normal.x * inverse[M11] + normal.y * inverse[M21] + normal.z * inverse[M31];
-    out.y = normal.x * inverse[M12] + normal.y * inverse[M22] + normal.z * inverse[M32];
-    out.z = normal.x * inverse[M13] + normal.y * inverse[M23] + normal.z * inverse[M33];
+    out.x = normal.x * modelview_inverse_cache[M11] + normal.y * modelview_inverse_cache[M21] + normal.z * modelview_inverse_cache[M31];
+    out.y = normal.x * modelview_inverse_cache[M12] + normal.y * modelview_inverse_cache[M22] + normal.z * modelview_inverse_cache[M32];
+    out.z = normal.x * modelview_inverse_cache[M13] + normal.y * modelview_inverse_cache[M23] + normal.z * modelview_inverse_cache[M33];
     return out;
 }
 
@@ -7416,6 +7451,9 @@ void glLoadIdentity(void)
     }
 
     matrix_identity(*current_matrix());
+    if (matrix_mode == GL_MODELVIEW) {
+        invalidate_modelview_inverse_cache();
+    }
 }
 
 void glPushMatrix(void)
@@ -7467,6 +7505,7 @@ void glPopMatrix(void)
             return;
         }
         memcpy(modelview, modelview_stack[--modelview_stack_top], sizeof(Matrix));
+        invalidate_modelview_inverse_cache();
     } else if (matrix_mode == GL_PROJECTION) {
         if (projection_stack_top <= 0) {
             set_error(GL_STACK_UNDERFLOW);
@@ -7485,18 +7524,27 @@ void glPopMatrix(void)
 static void load_current_matrix(const GLfloat *m)
 {
     memcpy(*current_matrix(), m, sizeof(Matrix));
+    if (matrix_mode == GL_MODELVIEW) {
+        invalidate_modelview_inverse_cache();
+    }
 }
 
 static void mult_current_matrix(const GLfloat *m)
 {
     Matrix *dst = current_matrix();
     matrix_multiply(*dst, *dst, m);
+    if (matrix_mode == GL_MODELVIEW) {
+        invalidate_modelview_inverse_cache();
+    }
 }
 
 static void premult_current_matrix(const GLfloat *m)
 {
     Matrix *dst = current_matrix();
     matrix_multiply(*dst, m, *dst);
+    if (matrix_mode == GL_MODELVIEW) {
+        invalidate_modelview_inverse_cache();
+    }
 }
 
 void glLoadMatrixf(const GLfloat *m)
@@ -7826,14 +7874,16 @@ void glColor3fv(const GLfloat *v)
 
 void glColor4f(float r, float g, float b, float a)
 {
-    ListCommand command = { LIST_CMD_COLOR4 };
-    command.f[0] = r;
-    command.f[1] = g;
-    command.f[2] = b;
-    command.f[3] = a;
-    record_command(command);
-    if (compile_only()) {
-        return;
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_COLOR4 };
+        command.f[0] = r;
+        command.f[1] = g;
+        command.f[2] = b;
+        command.f[3] = a;
+        record_command(command);
+        if (compile_only()) {
+            return;
+        }
     }
 
     current_color = (NxglBackendColor){ r, g, b, a };
@@ -7928,13 +7978,15 @@ void glIndexubv(const GLubyte *c)
 
 void glNormal3f(GLfloat x, GLfloat y, GLfloat z)
 {
-    ListCommand command = { LIST_CMD_NORMAL3 };
-    command.f[0] = x;
-    command.f[1] = y;
-    command.f[2] = z;
-    record_command(command);
-    if (compile_only()) {
-        return;
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_NORMAL3 };
+        command.f[0] = x;
+        command.f[1] = y;
+        command.f[2] = z;
+        record_command(command);
+        if (compile_only()) {
+            return;
+        }
     }
     current_normal = (NxglBackendVec3){ x, y, z };
 }
@@ -8005,12 +8057,14 @@ void glTexCoord1fv(const GLfloat *v)
 void glTexCoord2f(float s, float t)
 {
     int unit = active_texture_index();
-    ListCommand command = { LIST_CMD_TEXCOORD2 };
-    command.f[0] = s;
-    command.f[1] = t;
-    record_command(command);
-    if (compile_only()) {
-        return;
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_TEXCOORD2 };
+        command.f[0] = s;
+        command.f[1] = t;
+        record_command(command);
+        if (compile_only()) {
+            return;
+        }
     }
 
     if (unit >= 0) {
@@ -8032,13 +8086,15 @@ void glTexCoord2fv(const GLfloat *v)
 void glTexCoord3f(float s, float t, float r)
 {
     int unit = active_texture_index();
-    ListCommand command = { LIST_CMD_TEXCOORD3 };
-    command.f[0] = s;
-    command.f[1] = t;
-    command.f[2] = r;
-    record_command(command);
-    if (compile_only()) {
-        return;
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_TEXCOORD3 };
+        command.f[0] = s;
+        command.f[1] = t;
+        command.f[2] = r;
+        record_command(command);
+        if (compile_only()) {
+            return;
+        }
     }
 
     if (unit >= 0) {
@@ -8308,9 +8364,11 @@ void glBegin(uint32_t mode)
         set_error(GL_INVALID_ENUM);
         return;
     }
-    ListCommand command = { LIST_CMD_BEGIN };
-    command.a = mode;
-    record_command(command);
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_BEGIN };
+        command.a = mode;
+        record_command(command);
+    }
     begin_mode = mode;
     pending_count = 0;
     if (compile_only()) {
@@ -8409,25 +8467,33 @@ void glVertex3f(float x, float y, float z)
         set_error(GL_INVALID_OPERATION);
         return;
     }
-    ListCommand command = { LIST_CMD_VERTEX3 };
-    command.f[0] = x;
-    command.f[1] = y;
-    command.f[2] = z;
-    record_command(command);
-    if (compile_only()) {
-        return;
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_VERTEX3 };
+        command.f[0] = x;
+        command.f[1] = y;
+        command.f[2] = z;
+        record_command(command);
+        if (compile_only()) {
+            return;
+        }
     }
 
     memset(&vertex, 0, sizeof(vertex));
     init_vertex_position(&vertex, x, y, z, 1.0f);
-    NxglBackendVec3 normal = transform_normal_to_eye(current_normal);
     vertex.base_color = current_color;
-    vertex.normal = normal;
-    apply_texgen_to_coords(obj, vertex.eye, normal, &u0, &v0, &r0, 0);
-    apply_texgen_to_coords(obj, vertex.eye, normal, &u1, &v1, &r1, 1);
-    apply_texgen_to_coords(obj, vertex.eye, normal, &u2, &v2, &r2, 2);
-    apply_texgen_to_coords(obj, vertex.eye, normal, &u3, &v3, &r3, 3);
-    vertex.color = lit_color(current_color, normal, vertex.eye);
+    if (!lighting_enabled && !fog_enabled && !texgen_enabled()) {
+        vertex.normal = current_normal;
+        vertex.color = current_color;
+    } else {
+        NxglBackendVec3 normal = transform_normal_to_eye(current_normal);
+        vertex.normal = normal;
+        apply_texgen_to_coords(obj, vertex.eye, normal, &u0, &v0, &r0, 0);
+        apply_texgen_to_coords(obj, vertex.eye, normal, &u1, &v1, &r1, 1);
+        apply_texgen_to_coords(obj, vertex.eye, normal, &u2, &v2, &r2, 2);
+        apply_texgen_to_coords(obj, vertex.eye, normal, &u3, &v3, &r3, 3);
+        vertex.color = lit_color(current_color, normal, vertex.eye);
+        vertex.color = apply_fog(vertex.color, vertex.eye);
+    }
     vertex.u = u0;
     vertex.v = v0;
     vertex.r = r0;
@@ -8440,7 +8506,6 @@ void glVertex3f(float x, float y, float z)
     vertex.u3 = u3;
     vertex.v3 = v3;
     vertex.r3 = r3;
-    vertex.color = apply_fog(vertex.color, vertex.eye);
     pending[pending_count++] = vertex;
 }
 
@@ -8543,20 +8608,31 @@ void glVertex4sv(const GLshort *v)
 
 void glEnd(void)
 {
-    ListCommand command = { LIST_CMD_END };
+    uint32_t mode;
 
     if (begin_mode == NXGL_NO_BEGIN_MODE) {
         set_error(GL_INVALID_OPERATION);
         return;
     }
-    record_command(command);
+    if (is_recording()) {
+        ListCommand command = { LIST_CMD_END };
+        record_command(command);
+    }
     if (compile_only()) {
         pending_count = 0;
         begin_mode = NXGL_NO_BEGIN_MODE;
         return;
     }
 
-    emit_vertices(begin_mode, pending, pending_count);
+    mode = begin_mode;
+    if (native_fast_fill_enabled() && !lighting_enabled && shade_model == GL_SMOOTH && mode == GL_QUADS) {
+        ensure_native_frame_started();
+        for (int i = 0; i + 3 < pending_count; i += 4) {
+            nxgl_backend_push_quad(pending[i], pending[i + 1], pending[i + 2], pending[i + 3]);
+        }
+    } else {
+        emit_vertices(mode, pending, pending_count);
+    }
     pending_count = 0;
     begin_mode = NXGL_NO_BEGIN_MODE;
 }
@@ -11082,6 +11158,7 @@ void glEnable(uint32_t cap)
         }
         if (unit >= 0) {
             texgen_state[unit][texgen_coord].enabled = GL_TRUE;
+            texgen_any_enabled = true;
         }
     } else if (clip >= 0) {
         record_command(command);
@@ -11291,6 +11368,7 @@ void glDisable(uint32_t cap)
         }
         if (unit >= 0) {
             texgen_state[unit][texgen_coord].enabled = GL_FALSE;
+            update_texgen_enabled_cache();
         }
     } else if (clip >= 0) {
         record_command(command);
