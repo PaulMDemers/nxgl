@@ -79,6 +79,7 @@ void nxgl_backend_clear_depth_stencil(bool depth, float depth_value, bool stenci
 void nxgl_backend_set_depth(bool test, bool write);
 void nxgl_backend_set_cull(bool enabled);
 void nxgl_backend_set_cull_mode(uint32_t face, uint32_t front_face);
+void nxgl_backend_set_blend(bool enabled);
 void nxgl_backend_set_blend_func(uint32_t sfactor, uint32_t dfactor);
 void nxgl_backend_set_scissor(bool enabled, int x, int y, int width, int height);
 void nxgl_backend_set_projection(float fov_y_degrees, float near_z, float far_z);

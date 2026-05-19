@@ -825,6 +825,11 @@ void nxgl_backend_set_cull_mode(uint32_t face, uint32_t front_face)
     front_face_mode = front_face;
 }
 
+void nxgl_backend_set_blend(bool enabled)
+{
+    blend_enabled = enabled;
+}
+
 void nxgl_backend_set_blend_func(uint32_t sfactor, uint32_t dfactor)
 {
     blend_sfactor = sfactor;

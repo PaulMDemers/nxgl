@@ -2875,6 +2875,7 @@ static void sync_native_state(void)
     nxgl_backend_set_depth(depth_test_enabled, depth_write_enabled);
     nxgl_backend_set_cull(cull_enabled);
     nxgl_backend_set_cull_mode(cull_face_mode, front_face_mode);
+    nxgl_backend_set_blend(blend_enabled);
     nxgl_backend_set_blend_func(blend_sfactor, blend_dfactor);
     nxgl_backend_set_scissor(scissor_test_enabled, scissor_box[0], shadow_height - (scissor_box[1] + scissor_box[3]), scissor_box[2], scissor_box[3]);
     nxgl_backend_set_texture_env(native_texture_env_mode_for_unit(0), texture_env_color[0]);
@@ -11608,8 +11609,7 @@ void glBlendFunc(GLenum sfactor, GLenum dfactor)
 
     blend_sfactor = sfactor;
     blend_dfactor = dfactor;
-    (void)blend_sfactor;
-    (void)blend_dfactor;
+    sync_native_state();
 }
 
 void glActiveTexture(GLenum texture)
