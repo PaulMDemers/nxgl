@@ -24,3 +24,15 @@ make
 
 For GL behavior changes, add or update focused probes before marking coverage as
 verified.
+
+Before a release-facing change, run the standard verification wrapper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1
+```
+
+For a fast layout-only check before larger builds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl_layout.ps1
+```

@@ -23,7 +23,8 @@ make
 ```
 
 From PowerShell, the standard verification wrapper runs the root smoke checks,
-example build, autorun suite build, and focused probe groups:
+example build, autorun suite build, focused probe groups, and the structural
+layout audit:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1

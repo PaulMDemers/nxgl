@@ -82,7 +82,13 @@ For the standard local verification pass from PowerShell, use:
 powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl.ps1
 ```
 
-The wrapper finds MSYS2 and the sibling `.nxdk` checkout, then runs the root
-smoke checks, hello-triangle example, autorun suite build, and the focused
-texture/lighting/raster probe groups. It writes a log and JSON summary under
-`dist/verification`, which is ignored.
+The wrapper first runs a fast layout audit, then finds MSYS2 and the sibling
+`.nxdk` checkout. It runs the root smoke checks, hello-triangle example, autorun
+suite build, and the focused texture/lighting/raster probe groups. It writes a
+log and JSON summary under `dist/verification`, which is ignored.
+
+To run only the structural audit:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\verify_nxgl_layout.ps1
+```

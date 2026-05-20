@@ -81,6 +81,9 @@ function Get-CommandsForTarget {
 
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
+$layoutScript = Join-Path $PSScriptRoot "verify_nxgl_layout.ps1"
+& $layoutScript
+
 $bash = Find-Bash
 $nxdkPath = Resolve-NxdkDir $NxdkDir
 $repoMsys = Convert-ToMsysPath $repo.Path
