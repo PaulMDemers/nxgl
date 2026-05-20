@@ -62,6 +62,10 @@ typedef struct NxglBackendBatch {
     int scissor_y;
     int scissor_w;
     int scissor_h;
+    int viewport_x;
+    int viewport_y;
+    int viewport_w;
+    int viewport_h;
 } NxglBackendBatch;
 
 static NxglBackendGpuVertex *vertex_buffer;
@@ -88,6 +92,10 @@ static int scissor_x;
 static int scissor_y;
 static int scissor_w = NXGL_BACKEND_SCREEN_W;
 static int scissor_h = NXGL_BACKEND_SCREEN_H;
+static int viewport_x;
+static int viewport_y;
+static int viewport_w = NXGL_BACKEND_SCREEN_W;
+static int viewport_h = NXGL_BACKEND_SCREEN_H;
 
 extern unsigned int pb_ColorFmt;
 static bool scene_dirty;
@@ -557,7 +565,11 @@ static void ensure_batch(void)
             last->scissor_x == scissor_x &&
             last->scissor_y == scissor_y &&
             last->scissor_w == scissor_w &&
-            last->scissor_h == scissor_h) {
+            last->scissor_h == scissor_h &&
+            last->viewport_x == viewport_x &&
+            last->viewport_y == viewport_y &&
+            last->viewport_w == viewport_w &&
+            last->viewport_h == viewport_h) {
             return;
         }
     }
@@ -586,6 +598,10 @@ static void ensure_batch(void)
     last->scissor_y = scissor_y;
     last->scissor_w = scissor_w;
     last->scissor_h = scissor_h;
+    last->viewport_x = viewport_x;
+    last->viewport_y = viewport_y;
+    last->viewport_w = viewport_w;
+    last->viewport_h = viewport_h;
 }
 
 static float nxgl_backend_texel_coord(float coord, uint16_t size)
@@ -729,6 +745,10 @@ void nxgl_backend_begin_frame(bool blend)
     scissor_y = 0;
     scissor_w = back_width;
     scissor_h = back_height;
+    viewport_x = 0;
+    viewport_y = 0;
+    viewport_w = back_width;
+    viewport_h = back_height;
     projection_fov_y_degrees = 90.0f;
     projection_near_z = 1.0f;
     projection_far_z = 100.0f;
@@ -844,6 +864,20 @@ void nxgl_backend_set_scissor(bool enabled, int x, int y, int width, int height)
     scissor_y = y;
     scissor_w = width;
     scissor_h = height;
+}
+
+void nxgl_backend_set_viewport(int x, int y, int width, int height)
+{
+    if (width <= 0 || height <= 0) {
+        x = 0;
+        y = 0;
+        width = back_width;
+        height = back_height;
+    }
+    viewport_x = x;
+    viewport_y = y;
+    viewport_w = width;
+    viewport_h = height;
 }
 
 void nxgl_backend_set_projection(float fov_y_degrees, float near_z, float far_z)
@@ -1074,25 +1108,7 @@ void nxgl_backend_flush(void)
     while (pb_busy()) {
     }
 
-    Matrix view;
-    Matrix proj;
-    Matrix viewport;
-    Matrix proj_viewport;
-    Matrix mvp;
-
-    matrix_identity(view);
-    matrix_rotate(view, view, camera_rot);
-    matrix_translate(view, view, camera_pos);
-    matrix_projection(proj, (float)back_width / (float)back_height, projection_near_z, projection_far_z);
-    matrix_viewport(viewport, 0, 0, (float)back_width, (float)back_height, 0.0f, 65536.0f);
-    matrix_multiply(proj_viewport, proj, viewport);
-    matrix_multiply(mvp, view, proj_viewport);
-
     uint32_t *p = pb_begin();
-    p = pb_push1(p, NV097_SET_TRANSFORM_CONSTANT_LOAD, 96);
-    pb_push(p++, NV097_SET_TRANSFORM_CONSTANT, 16);
-    memcpy(p, mvp, 16 * 4);
-    p += 16;
     pb_push(p++, NV097_SET_VERTEX_DATA_ARRAY_FORMAT, 16);
     for (int i = 0; i < 16; ++i) {
         *(p++) = NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F;
@@ -1105,6 +1121,21 @@ void nxgl_backend_flush(void)
         bool cube_textured = textured && batch->texture->cube_map;
         bool volume_textured = textured && batch->texture->volume;
         bool multitextured = textured && !cube_textured && !volume_textured && batch->texture1 != NULL && batch->texture1->addr != NULL;
+
+        Matrix view;
+        Matrix proj;
+        Matrix viewport;
+        Matrix proj_viewport;
+        Matrix mvp;
+
+        matrix_identity(view);
+        matrix_rotate(view, view, camera_rot);
+        matrix_translate(view, view, camera_pos);
+        matrix_projection(proj, (float)batch->viewport_w / (float)batch->viewport_h, projection_near_z, projection_far_z);
+        matrix_viewport(viewport, (float)batch->viewport_x, (float)batch->viewport_y,
+                        (float)batch->viewport_w, (float)batch->viewport_h, 0.0f, 65536.0f);
+        matrix_multiply(proj_viewport, proj, viewport);
+        matrix_multiply(mvp, view, proj_viewport);
 
         setup_render_state(batch->blend, batch->blend_sfactor, batch->blend_dfactor,
                            batch->depth_test, batch->depth_write, batch->cull,
@@ -1137,6 +1168,13 @@ void nxgl_backend_flush(void)
                            3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex0[0]);
         set_attrib_pointer(10, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
                            3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex1[0]);
+
+        p = pb_begin();
+        p = pb_push1(p, NV097_SET_TRANSFORM_CONSTANT_LOAD, 96);
+        pb_push(p++, NV097_SET_TRANSFORM_CONSTANT, 16);
+        memcpy(p, mvp, 16 * 4);
+        p += 16;
+        pb_end(p);
 
         draw_arrays_range(batch->start, batch->count);
     }

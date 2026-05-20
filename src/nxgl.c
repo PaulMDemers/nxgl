@@ -2930,6 +2930,7 @@ static void sync_native_state(void)
     nxgl_backend_set_blend(blend_enabled);
     nxgl_backend_set_blend_func(blend_sfactor, blend_dfactor);
     nxgl_backend_set_scissor(scissor_test_enabled, scissor_box[0], shadow_height - (scissor_box[1] + scissor_box[3]), scissor_box[2], scissor_box[3]);
+    nxgl_backend_set_viewport(viewport[0], shadow_height - (viewport[1] + viewport[3]), viewport[2], viewport[3]);
     nxgl_backend_set_texture_env(native_texture_env_mode_for_unit(0), texture_env_color[0]);
     if (texture_2d_enabled[0] &&
         texture_binding_2d[0] > 0 &&
