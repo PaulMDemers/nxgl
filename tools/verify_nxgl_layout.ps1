@@ -1,6 +1,6 @@
 param(
-    [int]$ExpectedProbeCount = 81,
-    [int]$ExpectedAutorunVersion = 21
+    [int]$ExpectedProbeCount = 82,
+    [int]$ExpectedAutorunVersion = 22
 )
 
 $ErrorActionPreference = "Stop"

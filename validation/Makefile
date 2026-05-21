@@ -79,7 +79,8 @@ VALIDATION_PROBES := \
 	104_gl_depth_state_interlock_probe \
 	105_gl_alpha_logic_interlock_probe \
 	106_gl_pixel_transfer_interlock_probe \
-	107_gl_select_feedback_guardband_probe
+	107_gl_select_feedback_guardband_probe \
+	108_gl_backend_state_cache_probe
 
 TEXTURE_PROBES := \
 	29_gl_texture_upload_probe \
@@ -99,7 +100,8 @@ TEXTURE_PROBES := \
 	66_gl_pixelstore_3d_probe \
 	67_gl_copytex_probe \
 	69_gl_texgen_probe \
-	72_gl_texture1d_probe
+	72_gl_texture1d_probe \
+	108_gl_backend_state_cache_probe
 
 LIGHTING_PROBES := \
 	32_gl_lighting_probe \
@@ -127,7 +129,8 @@ RASTER_EDGE_PROBES := \
 	104_gl_depth_state_interlock_probe \
 	105_gl_alpha_logic_interlock_probe \
 	106_gl_pixel_transfer_interlock_probe \
-	107_gl_select_feedback_guardband_probe
+	107_gl_select_feedback_guardband_probe \
+	108_gl_backend_state_cache_probe
 
 .PHONY: all autorun texture lighting raster clean print-validation-apps
 

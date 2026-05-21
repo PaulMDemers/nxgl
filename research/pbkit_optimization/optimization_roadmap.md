@@ -82,10 +82,13 @@ Implemented so far:
 - Texture-stage descriptors and disables are skipped per unit when unchanged.
 - Vertex attribute pointers are emitted once per flush instead of once per
   batch.
+- `108_gl_backend_state_cache_probe` covers adjacent batch transitions across
+  shader keys, texture descriptors, multitexture unit enables, cube/2D texture
+  modes, blend, cull, and scissor.
 
 Remaining:
 
-- Focused probes that alternate adjacent draw state to catch stale-state bugs.
+- Split shader upload from shader select where possible.
 
 Expected payoff: lower per-batch overhead and less pushbuffer traffic.
 
