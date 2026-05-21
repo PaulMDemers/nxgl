@@ -45,6 +45,7 @@ typedef struct NxglBackendGpuVertex {
 typedef struct NxglBackendBatch {
     unsigned int start;
     unsigned int count;
+    uint32_t primitive_op;
     NxglBackendTexture *texture;
     NxglBackendTexture *texture1;
     NxglBackendTextureEnvMode texture_env_mode;
@@ -760,21 +761,22 @@ static void set_attrib_pointer(unsigned int index, unsigned int format, unsigned
     pb_end(p);
 }
 
-static void draw_arrays_range(unsigned int start, unsigned int count)
+static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t primitive_op)
 {
     const unsigned int max_vertices_per_draw = 255;
+    const unsigned int primitive_size = primitive_op == NV097_SET_BEGIN_END_OP_QUADS ? 4u : 3u;
 
     while (count > 0) {
         unsigned int chunk = count > max_vertices_per_draw ? max_vertices_per_draw : count;
-        if (chunk > 3 && chunk % 3 != 0) {
-            chunk -= chunk % 3;
+        if (chunk > primitive_size && chunk % primitive_size != 0) {
+            chunk -= chunk % primitive_size;
         }
         if (chunk == 0) {
             return;
         }
 
         uint32_t *p = pb_begin();
-        p = pb_push1(p, NV097_SET_BEGIN_END, NV097_SET_BEGIN_END_OP_TRIANGLES);
+        p = pb_push1(p, NV097_SET_BEGIN_END, primitive_op);
         p = pb_push1(p, 0x40000000 | NV097_DRAW_ARRAYS,
                      MASK(NV097_DRAW_ARRAYS_COUNT, (chunk - 1)) |
                      MASK(NV097_DRAW_ARRAYS_START_INDEX, start));
@@ -786,13 +788,14 @@ static void draw_arrays_range(unsigned int start, unsigned int count)
     }
 }
 
-static void ensure_batch(void)
+static bool ensure_batch(uint32_t primitive_op)
 {
     NxglBackendBatch *last;
 
     if (batch_count > 0) {
         last = &batches[batch_count - 1];
-        if (last->texture == bound_texture &&
+        if (last->primitive_op == primitive_op &&
+            last->texture == bound_texture &&
             last->texture1 == bound_texture1 &&
             last->texture_env_mode == bound_texture_env_mode &&
             last->texture_env_color.r == bound_texture_env_color.r &&
@@ -816,17 +819,18 @@ static void ensure_batch(void)
             last->viewport_y == viewport_y &&
             last->viewport_w == viewport_w &&
             last->viewport_h == viewport_h) {
-            return;
+            return true;
         }
     }
 
     if (batch_count >= NXGL_BACKEND_MAX_BATCHES) {
-        return;
+        return false;
     }
 
     last = &batches[batch_count++];
     last->start = vertex_count;
     last->count = 0;
+    last->primitive_op = primitive_op;
     last->texture = bound_texture;
     last->texture1 = bound_texture1;
     last->texture_env_mode = bound_texture_env_mode;
@@ -848,6 +852,7 @@ static void ensure_batch(void)
     last->viewport_y = viewport_y;
     last->viewport_w = viewport_w;
     last->viewport_h = viewport_h;
+    return true;
 }
 
 static float nxgl_backend_texel_coord(float coord, uint16_t size)
@@ -855,14 +860,16 @@ static float nxgl_backend_texel_coord(float coord, uint16_t size)
     return coord * (float)size;
 }
 
-static void push_vertex(NxglBackendVertex src)
+static void push_vertex(NxglBackendVertex src, uint32_t primitive_op)
 {
     if (vertex_count >= NXGL_BACKEND_MAX_VERTICES) {
         return;
     }
+    if (!ensure_batch(primitive_op)) {
+        return;
+    }
 
     scene_dirty = true;
-    ensure_batch();
     NxglBackendGpuVertex *dst = &vertex_buffer[vertex_count++];
     dst->pos[0] = src.pos.x;
     dst->pos[1] = src.pos.y;
@@ -1151,15 +1158,17 @@ void nxgl_backend_set_camera(float x, float y, float z, float rx, float ry, floa
 
 void nxgl_backend_push_triangle(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c)
 {
-    push_vertex(a);
-    push_vertex(b);
-    push_vertex(c);
+    push_vertex(a, NV097_SET_BEGIN_END_OP_TRIANGLES);
+    push_vertex(b, NV097_SET_BEGIN_END_OP_TRIANGLES);
+    push_vertex(c, NV097_SET_BEGIN_END_OP_TRIANGLES);
 }
 
 void nxgl_backend_push_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d)
 {
-    nxgl_backend_push_triangle(a, b, c);
-    nxgl_backend_push_triangle(a, c, d);
+    push_vertex(a, NV097_SET_BEGIN_END_OP_QUADS);
+    push_vertex(b, NV097_SET_BEGIN_END_OP_QUADS);
+    push_vertex(c, NV097_SET_BEGIN_END_OP_QUADS);
+    push_vertex(d, NV097_SET_BEGIN_END_OP_QUADS);
 }
 
 int nxgl_backend_texture_create_rgba(NxglBackendTexture *texture, uint16_t width, uint16_t height, const uint8_t *rgba)
@@ -1424,7 +1433,7 @@ void nxgl_backend_flush(void)
         p += 16;
         pb_end(p);
 
-        draw_arrays_range(batch->start, batch->count);
+        draw_arrays_range(batch->start, batch->count, batch->primitive_op);
     }
 
     while (pb_busy()) {

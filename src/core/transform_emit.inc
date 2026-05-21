@@ -1934,11 +1934,9 @@ static void emit_clipped_fill_polygon(const NxglBackendVertex *vertices, int cou
 
     if (clipped_count == 4) {
         shadow_fill_bounds(clipped[0], clipped[1], clipped[2], clipped[3], true, false);
-        for (int i = 1; i + 1 < clipped_count; ++i) {
-            ensure_native_frame_started();
-            nxgl_backend_push_triangle(clipped[0], clipped[i], clipped[i + 1]);
-            perf_backend_triangle();
-        }
+        ensure_native_frame_started();
+        nxgl_backend_push_quad(clipped[0], clipped[1], clipped[2], clipped[3]);
+        perf_backend_quad();
         return;
     }
 

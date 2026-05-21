@@ -86,7 +86,8 @@ static void run_probe(void)
     nxglSwapBuffers("NXGL fast readback", "fast path warmup");
     nxglGetPerfCounters(&counters);
     expect_bool("fast render keeps shadow unallocated",
-                counters.backend_vertices > 0 &&
+                counters.backend_batches == 1 &&
+                counters.backend_vertices == 4 &&
                 counters.shadow_buffer_allocations == 0 &&
                 counters.shadow_primitives == 0 &&
                 consume_error(GL_NO_ERROR),
