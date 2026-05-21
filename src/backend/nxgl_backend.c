@@ -761,6 +761,29 @@ static void set_attrib_pointer(unsigned int index, unsigned int format, unsigned
     pb_end(p);
 }
 
+static uint32_t primitive_op_from_backend(NxglBackendPrimitive primitive)
+{
+    switch (primitive) {
+    case NXGL_BACKEND_PRIMITIVE_TRIANGLE_STRIP:
+        return NV097_SET_BEGIN_END_OP_TRIANGLE_STRIP;
+    case NXGL_BACKEND_PRIMITIVE_TRIANGLE_FAN:
+        return NV097_SET_BEGIN_END_OP_TRIANGLE_FAN;
+    case NXGL_BACKEND_PRIMITIVE_QUADS:
+        return NV097_SET_BEGIN_END_OP_QUADS;
+    case NXGL_BACKEND_PRIMITIVE_QUAD_STRIP:
+        return NV097_SET_BEGIN_END_OP_QUAD_STRIP;
+    case NXGL_BACKEND_PRIMITIVE_TRIANGLES:
+    default:
+        return NV097_SET_BEGIN_END_OP_TRIANGLES;
+    }
+}
+
+static bool primitive_op_can_chunk(uint32_t primitive_op)
+{
+    return primitive_op == NV097_SET_BEGIN_END_OP_TRIANGLES ||
+           primitive_op == NV097_SET_BEGIN_END_OP_QUADS;
+}
+
 static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t primitive_op)
 {
     const unsigned int max_vertices_per_draw = 255;
@@ -768,7 +791,10 @@ static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t p
 
     while (count > 0) {
         unsigned int chunk = count > max_vertices_per_draw ? max_vertices_per_draw : count;
-        if (chunk > primitive_size && chunk % primitive_size != 0) {
+        if (!primitive_op_can_chunk(primitive_op) && count > max_vertices_per_draw) {
+            return;
+        }
+        if (primitive_op_can_chunk(primitive_op) && chunk > primitive_size && chunk % primitive_size != 0) {
             chunk -= chunk % primitive_size;
         }
         if (chunk == 0) {
@@ -788,11 +814,11 @@ static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t p
     }
 }
 
-static bool ensure_batch(uint32_t primitive_op)
+static bool ensure_batch(uint32_t primitive_op, bool appendable)
 {
     NxglBackendBatch *last;
 
-    if (batch_count > 0) {
+    if (appendable && batch_count > 0) {
         last = &batches[batch_count - 1];
         if (last->primitive_op == primitive_op &&
             last->texture == bound_texture &&
@@ -865,7 +891,7 @@ static void push_vertex(NxglBackendVertex src, uint32_t primitive_op)
     if (vertex_count >= NXGL_BACKEND_MAX_VERTICES) {
         return;
     }
-    if (!ensure_batch(primitive_op)) {
+    if (!ensure_batch(primitive_op, true)) {
         return;
     }
 
@@ -1169,6 +1195,24 @@ void nxgl_backend_push_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBacken
     push_vertex(b, NV097_SET_BEGIN_END_OP_QUADS);
     push_vertex(c, NV097_SET_BEGIN_END_OP_QUADS);
     push_vertex(d, NV097_SET_BEGIN_END_OP_QUADS);
+}
+
+void nxgl_backend_push_primitive(NxglBackendPrimitive primitive, const NxglBackendVertex *vertices, unsigned int count)
+{
+    uint32_t primitive_op = primitive_op_from_backend(primitive);
+
+    if (vertices == NULL || count == 0 || count > 255u) {
+        return;
+    }
+    if (vertex_count + count > NXGL_BACKEND_MAX_VERTICES) {
+        return;
+    }
+    if (!ensure_batch(primitive_op, primitive_op_can_chunk(primitive_op))) {
+        return;
+    }
+    for (unsigned int i = 0; i < count; ++i) {
+        push_vertex(vertices[i], primitive_op);
+    }
 }
 
 int nxgl_backend_texture_create_rgba(NxglBackendTexture *texture, uint16_t width, uint16_t height, const uint8_t *rgba)

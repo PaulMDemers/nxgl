@@ -110,17 +110,22 @@ multitexture, cull/depth/blend, and scissor across adjacent draws.
 ## Pass 3: Indexed Submission
 
 nxdk's mesh sample uses `NV20_TCL_PRIMITIVE_3D_INDEX_DATA`. NXGL currently
-triangulates most polygons before backend submission. Native quad submission is
-now used as a low-risk first step, so unclipped and four-vertex clipped quads
-submit four vertices with `NV097_SET_BEGIN_END_OP_QUADS` instead of duplicating
-them into two triangles. The remaining mesh-like optimization target is indexed
-submission with `NV20_TCL_PRIMITIVE_3D_INDEX_DATA`.
+triangulates most polygons before backend submission. Native primitive
+submission is now used as a low-risk first step, so unclipped and four-vertex
+clipped quads submit with `NV097_SET_BEGIN_END_OP_QUADS`, and compact fast-mode
+triangle strips, triangle fans, and quad strips submit as their matching NV2A
+primitive modes instead of being decomposed into repeated triangles. The
+remaining mesh-like optimization target is indexed submission with
+`NV20_TCL_PRIMITIVE_3D_INDEX_DATA`.
 
 Implemented so far:
 
 - Backend batches track the native primitive op and draw quad batches as
   `QUADS` through `NV097_DRAW_ARRAYS`, reducing cube/quad vertex traffic from
   six backend vertices to four.
+- Fast-mode `GL_TRIANGLE_STRIP`, `GL_TRIANGLE_FAN`, and `GL_QUAD_STRIP`
+  submissions can stay as native strip/fan batches for compact primitive runs,
+  avoiding avoidable CPU decomposition.
 
 Actions:
 

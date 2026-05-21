@@ -2195,8 +2195,52 @@ static void emit_quad_vertices(NxglBackendVertex a, NxglBackendVertex b, NxglBac
     }
 }
 
+static bool emit_native_fast_primitive(GLenum mode, const NxglBackendVertex *vertices, GLsizei count)
+{
+    NxglBackendPrimitive primitive;
+
+    if (!native_fast_fill_enabled() || lighting_enabled || shade_model != GL_SMOOTH || vertices == NULL || count <= 0 || count > 255) {
+        return false;
+    }
+
+    switch (mode) {
+    case GL_TRIANGLE_STRIP:
+        if (count < 3) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_TRIANGLE_STRIP;
+        break;
+    case GL_TRIANGLE_FAN:
+        if (count < 3) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_TRIANGLE_FAN;
+        break;
+    case GL_QUAD_STRIP:
+        if (count < 4) {
+            return true;
+        }
+        if ((count & 1) != 0) {
+            --count;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_QUAD_STRIP;
+        break;
+    default:
+        return false;
+    }
+
+    ensure_native_frame_started();
+    nxgl_backend_push_primitive(primitive, vertices, (unsigned int)count);
+    perf_backend_primitive_vertices((uint32_t)count);
+    return true;
+}
+
 static void emit_vertices(GLenum mode, const NxglBackendVertex *vertices, GLsizei count)
 {
+    if (emit_native_fast_primitive(mode, vertices, count)) {
+        return;
+    }
+
     if (mode == GL_TRIANGLES) {
         for (GLsizei i = 0; i + 2 < count; i += 3) {
             emit_triangle_vertices(vertices[i], vertices[i + 1], vertices[i + 2]);

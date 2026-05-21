@@ -107,9 +107,9 @@ buffers if readback is re-enabled.
    logic in software.
 3. Selection/feedback and pixel-transfer paths force CPU-side projected
    geometry and framebuffer state.
-4. The backend now submits native `QUADS` batches for four-vertex quads, but
-   triangle fans/strips and larger mesh-like primitives are still expanded
-   without indexed mesh-style submission.
+4. The backend now submits native `QUADS` batches for four-vertex quads and
+   compact fast-mode strip/fan primitive runs, but larger mesh-like primitives
+   still lack indexed mesh-style submission.
 5. Shader variants are cached by current shader key, but program upload versus
    shader select has not been split yet.
 6. Texture stage state is cached per unit, but the descriptor values still use

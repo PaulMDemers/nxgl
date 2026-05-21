@@ -611,6 +611,12 @@ static void perf_backend_quad(void)
     perf_counters.backend_vertices += 4;
 }
 
+static void perf_backend_primitive_vertices(uint32_t vertices)
+{
+    ++perf_counters.backend_batches;
+    perf_counters.backend_vertices += vertices;
+}
+
 static int source_components(GLenum format);
 static int texgen_coord_index(GLenum coord);
 static GLenum texgen_cap_from_index(int index);
