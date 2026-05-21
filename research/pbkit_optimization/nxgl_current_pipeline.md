@@ -53,6 +53,12 @@ The backend currently reloads vertex/pixel program state per batch based on the
 batch texture mode. This is correct but expensive and more visible than it
 needs to be.
 
+Initial backend caching now skips identical shader uploads and unchanged
+depth/cull/blend/scissor setup within a frame. The shared vertex attribute
+pointers are also emitted once per flush instead of once per batch. Texture
+stage descriptors are still emitted per batch until the unit enable/disable
+interactions get a complete cache key.
+
 ## Software/CPU Compatibility Paths
 
 `src/nxgl.c` keeps CPU-visible shadows:
@@ -102,8 +108,8 @@ buffers if readback is re-enabled.
    geometry and framebuffer state.
 4. The backend uses duplicated triangle vertices and `NV097_DRAW_ARRAYS`;
    indexed mesh-style submission is not used.
-5. Shader variants are reloaded per batch instead of cached by current shader
-   key.
+5. Shader variants are cached by current shader key, but program upload versus
+   shader select has not been split yet.
 6. Texture stage state is pushed repeatedly even when unchanged.
 7. `pb_begin()` / `pb_end()` calls are frequent, especially during shader loads,
    texture setup, and per-batch state setup.

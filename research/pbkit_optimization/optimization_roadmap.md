@@ -59,6 +59,8 @@ sample-level call first.
 
 ## Pass 2: Cache Backend State and Shader Programs
 
+Status: initial shader/render-state caching is implemented.
+
 Actions:
 
 - Track current backend shader key:
@@ -70,6 +72,20 @@ Actions:
 - Consider loading all common programs once at init if NV2A program memory and
   combiner state permit; otherwise cache "last uploaded" and avoid reuploading
   identical programs batch-to-batch.
+- Hoist fixed vertex attribute pointer setup out of the per-batch loop when
+  drawing from the shared backend vertex buffer.
+
+Implemented so far:
+
+- Shader uploads are skipped when the next batch uses the same shader key.
+- Depth/cull/blend/scissor registers are skipped when unchanged.
+- Vertex attribute pointers are emitted once per flush instead of once per
+  batch.
+
+Remaining:
+
+- Texture-stage descriptor caching per unit.
+- Focused probes that alternate adjacent draw state to catch stale-state bugs.
 
 Expected payoff: lower per-batch overhead and less pushbuffer traffic.
 

@@ -68,6 +68,37 @@ typedef struct NxglBackendBatch {
     int viewport_h;
 } NxglBackendBatch;
 
+typedef enum NxglBackendShaderKind {
+    NXGL_BACKEND_SHADER_COLOR,
+    NXGL_BACKEND_SHADER_TEXTURE,
+    NXGL_BACKEND_SHADER_MULTITEXTURE,
+    NXGL_BACKEND_SHADER_CUBE,
+    NXGL_BACKEND_SHADER_TEXTURE3D
+} NxglBackendShaderKind;
+
+typedef struct NxglBackendShaderCache {
+    bool valid;
+    NxglBackendShaderKind kind;
+    NxglBackendTextureEnvMode texture_env_mode;
+    uint32_t texture_env_color;
+} NxglBackendShaderCache;
+
+typedef struct NxglBackendRenderStateCache {
+    bool valid;
+    bool blend;
+    uint32_t sfactor;
+    uint32_t dfactor;
+    bool depth_test;
+    bool depth_write;
+    bool cull;
+    uint32_t cull_face;
+    uint32_t front_face;
+    int clip_x1;
+    int clip_y1;
+    int clip_x2;
+    int clip_y2;
+} NxglBackendRenderStateCache;
+
 static NxglBackendGpuVertex *vertex_buffer;
 static unsigned int vertex_count;
 static NxglBackendBatch batches[NXGL_BACKEND_MAX_BATCHES];
@@ -104,6 +135,14 @@ static Vector camera_rot = { 0.0f, 0.0f, 0.0f, 1.0f };
 static float projection_fov_y_degrees = 90.0f;
 static float projection_near_z = 1.0f;
 static float projection_far_z = 100.0f;
+static NxglBackendShaderCache shader_cache;
+static NxglBackendRenderStateCache render_state_cache;
+
+static void invalidate_backend_state_cache(void)
+{
+    shader_cache.valid = false;
+    render_state_cache.valid = false;
+}
 
 static void matrix_identity(Matrix out)
 {
@@ -412,22 +451,107 @@ static void load_texture3d_shader(void)
     pb_end(p);
 }
 
+static bool shader_cache_matches(NxglBackendShaderKind kind,
+                                 NxglBackendTextureEnvMode mode,
+                                 uint32_t env_color)
+{
+    return shader_cache.valid &&
+           shader_cache.kind == kind &&
+           shader_cache.texture_env_mode == mode &&
+           shader_cache.texture_env_color == env_color;
+}
+
+static void mark_shader_cache(NxglBackendShaderKind kind,
+                              NxglBackendTextureEnvMode mode,
+                              uint32_t env_color)
+{
+    shader_cache.valid = true;
+    shader_cache.kind = kind;
+    shader_cache.texture_env_mode = mode;
+    shader_cache.texture_env_color = env_color;
+}
+
+static void use_color_shader(void)
+{
+    if (shader_cache_matches(NXGL_BACKEND_SHADER_COLOR, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        return;
+    }
+    load_color_shader();
+    mark_shader_cache(NXGL_BACKEND_SHADER_COLOR, NXGL_BACKEND_TEXENV_MODULATE, 0);
+}
+
+static void use_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor env_color)
+{
+    uint32_t env_key = packed_color(env_color);
+    if (shader_cache_matches(NXGL_BACKEND_SHADER_TEXTURE, mode, env_key)) {
+        return;
+    }
+    load_texture_shader(mode, env_color);
+    mark_shader_cache(NXGL_BACKEND_SHADER_TEXTURE, mode, env_key);
+}
+
+static void use_multitexture_shader(void)
+{
+    if (shader_cache_matches(NXGL_BACKEND_SHADER_MULTITEXTURE, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        return;
+    }
+    load_multitexture_shader();
+    mark_shader_cache(NXGL_BACKEND_SHADER_MULTITEXTURE, NXGL_BACKEND_TEXENV_MODULATE, 0);
+}
+
+static void use_cube_texture_shader(void)
+{
+    if (shader_cache_matches(NXGL_BACKEND_SHADER_CUBE, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        return;
+    }
+    load_cube_texture_shader();
+    mark_shader_cache(NXGL_BACKEND_SHADER_CUBE, NXGL_BACKEND_TEXENV_MODULATE, 0);
+}
+
+static void use_texture3d_shader(void)
+{
+    if (shader_cache_matches(NXGL_BACKEND_SHADER_TEXTURE3D, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        return;
+    }
+    load_texture3d_shader();
+    mark_shader_cache(NXGL_BACKEND_SHADER_TEXTURE3D, NXGL_BACKEND_TEXENV_MODULATE, 0);
+}
+
 static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
                                bool depth_test, bool depth_write, bool cull,
                                uint32_t cull_face, uint32_t front_face,
                                bool scissor, int sx, int sy, int sw, int sh)
 {
-    uint32_t *p = pb_begin();
     int x1 = scissor ? sx : 0;
     int y1 = scissor ? sy : 0;
     int x2 = scissor ? sx + sw : back_width;
     int y2 = scissor ? sy + sh : back_height;
+    uint32_t *p;
+
     if (x1 < 0) x1 = 0;
     if (y1 < 0) y1 = 0;
     if (x2 < x1) x2 = x1;
     if (y2 < y1) y2 = y1;
     if (x2 > back_width) x2 = back_width;
     if (y2 > back_height) y2 = back_height;
+
+    if (render_state_cache.valid &&
+        render_state_cache.blend == blend &&
+        render_state_cache.sfactor == sfactor &&
+        render_state_cache.dfactor == dfactor &&
+        render_state_cache.depth_test == depth_test &&
+        render_state_cache.depth_write == depth_write &&
+        render_state_cache.cull == cull &&
+        render_state_cache.cull_face == cull_face &&
+        render_state_cache.front_face == front_face &&
+        render_state_cache.clip_x1 == x1 &&
+        render_state_cache.clip_y1 == y1 &&
+        render_state_cache.clip_x2 == x2 &&
+        render_state_cache.clip_y2 == y2) {
+        return;
+    }
+
+    p = pb_begin();
     p = pb_push1(p, NV097_SET_DEPTH_TEST_ENABLE, depth_test ? 1 : 0);
     p = pb_push1(p, NV097_SET_DEPTH_FUNC, NV097_SET_DEPTH_FUNC_V_LEQUAL);
     p = pb_push1(p, NV097_SET_DEPTH_MASK, depth_write ? 1 : 0);
@@ -445,6 +569,20 @@ static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_SCISSOR_X2_X1, ((uint32_t)x2 << 16) | (uint32_t)x1);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_SCISSOR_Y2_Y1, ((uint32_t)y2 << 16) | (uint32_t)y1);
     pb_end(p);
+
+    render_state_cache.valid = true;
+    render_state_cache.blend = blend;
+    render_state_cache.sfactor = sfactor;
+    render_state_cache.dfactor = dfactor;
+    render_state_cache.depth_test = depth_test;
+    render_state_cache.depth_write = depth_write;
+    render_state_cache.cull = cull;
+    render_state_cache.cull_face = cull_face;
+    render_state_cache.front_face = front_face;
+    render_state_cache.clip_x1 = x1;
+    render_state_cache.clip_y1 = y1;
+    render_state_cache.clip_x2 = x2;
+    render_state_cache.clip_y2 = y2;
 }
 
 static void setup_texture_stage(NxglBackendTexture *texture)
@@ -660,7 +798,8 @@ int nxgl_backend_init(void)
     pb_show_front_screen();
     back_width = pb_back_buffer_width();
     back_height = pb_back_buffer_height();
-    load_color_shader();
+    invalidate_backend_state_cache();
+    use_color_shader();
 
     vertex_buffer = MmAllocateContiguousMemoryEx(sizeof(NxglBackendGpuVertex) * NXGL_BACKEND_MAX_VERTICES, 0, NXGL_BACKEND_MAXRAM, 0, PAGE_READWRITE | PAGE_WRITECOMBINE);
     if (vertex_buffer == NULL) {
@@ -756,6 +895,7 @@ void nxgl_backend_begin_frame(bool blend)
     pb_reset();
     pb_target_back_buffer();
     pb_erase_text_screen();
+    invalidate_backend_state_cache();
     bound_texture = NULL;
     bound_texture1 = NULL;
     bound_texture_env_mode = NXGL_BACKEND_TEXENV_MODULATE;
@@ -1115,6 +1255,15 @@ void nxgl_backend_flush(void)
     }
     pb_end(p);
 
+    set_attrib_pointer(0, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
+                       3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].pos[0]);
+    set_attrib_pointer(3, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
+                       4, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].color[0]);
+    set_attrib_pointer(9, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
+                       3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex0[0]);
+    set_attrib_pointer(10, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
+                       3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex1[0]);
+
     for (unsigned int i = 0; i < batch_count; ++i) {
         NxglBackendBatch *batch = &batches[i];
         bool textured = batch->texture != NULL && batch->texture->addr != NULL;
@@ -1145,29 +1294,20 @@ void nxgl_backend_flush(void)
         if (multitextured) {
             setup_texture_stage(batch->texture);
             setup_texture_stage1(batch->texture1);
-            load_multitexture_shader();
+            use_multitexture_shader();
         } else if (cube_textured) {
             setup_texture_stage(batch->texture);
-            load_cube_texture_shader();
+            use_cube_texture_shader();
         } else if (volume_textured) {
             setup_texture_stage(batch->texture);
-            load_texture3d_shader();
+            use_texture3d_shader();
         } else if (textured) {
             setup_texture_stage(batch->texture);
-            load_texture_shader(batch->texture_env_mode, batch->texture_env_color);
+            use_texture_shader(batch->texture_env_mode, batch->texture_env_color);
         } else {
             disable_texture_stages();
-            load_color_shader();
+            use_color_shader();
         }
-
-        set_attrib_pointer(0, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].pos[0]);
-        set_attrib_pointer(3, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           4, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].color[0]);
-        set_attrib_pointer(9, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex0[0]);
-        set_attrib_pointer(10, NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F,
-                           3, sizeof(NxglBackendGpuVertex), &vertex_buffer[0].tex1[0]);
 
         p = pb_begin();
         p = pb_push1(p, NV097_SET_TRANSFORM_CONSTANT_LOAD, 96);
