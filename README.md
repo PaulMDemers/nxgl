@@ -17,8 +17,11 @@ map.
 ## Layout
 
 - `include/nxgl.h` exposes the public GL-compatible API.
-- `src/nxgl.c` contains GL state, validation, matrix, texture, lighting, raster,
-  selection, feedback, and pixel-path behavior.
+- `src/nxgl.c` is the single translation-unit driver for the compatibility
+  layer.
+- `src/core/` contains the split NXGL implementation sections: state/helpers,
+  transform and primitive emission, shadow/readback compatibility, public GL
+  APIs, array/list handling, and texture APIs.
 - `src/backend/` contains the current PBKit renderer backend and shader sources.
 - `src/common3d/` contains shared backend shader sources.
 - `examples/` contains small standalone nxdk consumers of `nxgl.mk`.
@@ -60,6 +63,18 @@ With readback disabled, filled triangle and quad primitives can take a native
 fast path, while readback-dependent APIs such as `glReadPixels`,
 `glDrawPixels`, `glCopyPixels`, `glBitmap`, and `glAccum` report
 `GL_INVALID_OPERATION`.
+
+For optimization work, NXGL exposes lightweight counters:
+
+```c
+NxglPerfCounters counters;
+nxglResetPerfCounters();
+/* render workload */
+nxglGetPerfCounters(&counters);
+```
+
+The counters distinguish backend primitive pushes, shadow/readback work,
+pixel-transfer calls, texture uploads, and frame-level activity.
 
 ## Documentation
 

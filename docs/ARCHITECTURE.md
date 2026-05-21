@@ -10,7 +10,27 @@ types exposed to applications.
 
 ## GL State Layer
 
-`src/nxgl.c` owns OpenGL-like behavior:
+`src/nxgl.c` remains a single translation unit so the compatibility layer can
+keep file-local state and helpers. The implementation body is split under
+`src/core/`:
+
+- `internal_state.inc`: private types, global GL state, prototypes, and perf
+  counter storage
+- `state_helpers.inc`: display-list, texture-object, pixel-store, evaluator,
+  texgen, and validation helpers
+- `transform_emit.inc`: math, lighting/fog application, clipping,
+  selection/feedback emission, and primitive submission
+- `shadow_compat.inc`: CPU shadow/readback raster and texture sampling paths
+- `core_api.inc`: initialization, queries, viewport, clear, and accumulation
+- `immediate_api.inc`: matrices and immediate-mode entry points
+- `pixel_selection_api.inc`: pixel transfer, raster position, bitmap,
+  read/draw/copy pixels, select, and feedback APIs
+- `state_array_list_api.inc`: enables, attrib stacks, client arrays, draw
+  arrays/elements, and display lists
+- `texture_api.inc`: texture object APIs, texenv, pixel packing, and image
+  conversion
+
+Together, these sections own OpenGL-like behavior:
 
 - matrix stacks and transforms
 - texture object state and upload paths
@@ -20,6 +40,14 @@ types exposed to applications.
 - raster state, pixel transfer, depth, stencil, blend, and logic interlocks
 
 This layer should remain backend-aware only through the backend contract.
+
+## Performance Counters
+
+`NxglPerfCounters` exposes lightweight runtime counters for optimization work.
+They are intentionally coarse: frame swaps, clears, immediate/array/list draw
+entry points, backend primitive pushes, shadow/readback work, pixel-transfer
+calls, and texture uploads. Use `nxglResetPerfCounters()` and
+`nxglGetPerfCounters()` around a workload to compare optimization passes.
 
 ## PBKit Backend
 

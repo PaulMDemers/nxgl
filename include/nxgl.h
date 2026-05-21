@@ -568,6 +568,29 @@ void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz);
 void nxglSetReadbackEnabled(GLboolean enabled);
 void nxglSwapBuffers(const char *title, const char *detail);
 
+typedef struct NxglPerfCounters {
+    uint32_t frames;
+    uint32_t clears;
+    uint32_t immediate_begins;
+    uint32_t array_draws;
+    uint32_t element_draws;
+    uint32_t display_list_calls;
+    uint32_t backend_batches;
+    uint32_t backend_vertices;
+    uint32_t shadow_primitives;
+    uint32_t shadow_fragments;
+    uint32_t read_pixels_calls;
+    uint32_t draw_pixels_calls;
+    uint32_t copy_pixels_calls;
+    uint32_t texture_uploads;
+    uint32_t texture_sub_uploads;
+    uint32_t compressed_texture_uploads;
+    uint32_t compressed_texture_sub_uploads;
+} NxglPerfCounters;
+
+void nxglResetPerfCounters(void);
+void nxglGetPerfCounters(NxglPerfCounters *counters);
+
 const GLubyte *glGetString(GLenum name);
 GLenum glGetError(void);
 GLboolean glIsEnabled(GLenum cap);
