@@ -99,6 +99,18 @@ typedef struct NxglBackendRenderStateCache {
     int clip_y2;
 } NxglBackendRenderStateCache;
 
+typedef struct NxglBackendTextureStageCache {
+    bool valid;
+    bool enabled;
+    uint32_t offset;
+    uint32_t format;
+    uint32_t depth;
+    uint32_t pitch;
+    uint32_t size;
+    uint32_t wrap;
+    uint32_t filter;
+} NxglBackendTextureStageCache;
+
 static NxglBackendGpuVertex *vertex_buffer;
 static unsigned int vertex_count;
 static NxglBackendBatch batches[NXGL_BACKEND_MAX_BATCHES];
@@ -137,11 +149,15 @@ static float projection_near_z = 1.0f;
 static float projection_far_z = 100.0f;
 static NxglBackendShaderCache shader_cache;
 static NxglBackendRenderStateCache render_state_cache;
+static NxglBackendTextureStageCache texture_stage_cache[4];
 
 static void invalidate_backend_state_cache(void)
 {
     shader_cache.valid = false;
     render_state_cache.valid = false;
+    for (unsigned int i = 0; i < 4; ++i) {
+        texture_stage_cache[i].valid = false;
+    }
 }
 
 static void matrix_identity(Matrix out)
@@ -585,60 +601,127 @@ static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
     render_state_cache.clip_y2 = y2;
 }
 
-static void setup_texture_stage(NxglBackendTexture *texture)
+static uint32_t texture_stage_format(NxglBackendTexture *texture, bool allow_cube_map)
 {
-    uint32_t *p = pb_begin();
     uint32_t format = texture->format != 0 ? texture->format : NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
-    if (texture->cube_map) {
+    if (allow_cube_map && texture->cube_map) {
         format |= NV097_SET_TEXTURE_FORMAT_CUBEMAP_ENABLE;
     }
-    p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(0), (uint32_t)texture->addr & 0x03ffffff, format);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(0), texture->depth);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(0), texture->pitch << 16);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_SIZE(0), (texture->width << 16) | texture->height);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(0), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(0), 0x4003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(0), 0x04074000);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(1), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(2), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(3), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(1), 0x02022000);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(2), 0x02022000);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(3), 0x02022000);
+    return format;
+}
+
+static bool texture_stage_cache_matches(unsigned int unit,
+                                        uint32_t offset,
+                                        uint32_t format,
+                                        uint32_t depth,
+                                        uint32_t pitch,
+                                        uint32_t size,
+                                        uint32_t wrap,
+                                        uint32_t filter)
+{
+    NxglBackendTextureStageCache *cache = &texture_stage_cache[unit];
+    return cache->valid &&
+           cache->enabled &&
+           cache->offset == offset &&
+           cache->format == format &&
+           cache->depth == depth &&
+           cache->pitch == pitch &&
+           cache->size == size &&
+           cache->wrap == wrap &&
+           cache->filter == filter;
+}
+
+static void mark_texture_stage_enabled(unsigned int unit,
+                                       uint32_t offset,
+                                       uint32_t format,
+                                       uint32_t depth,
+                                       uint32_t pitch,
+                                       uint32_t size,
+                                       uint32_t wrap,
+                                       uint32_t filter)
+{
+    NxglBackendTextureStageCache *cache = &texture_stage_cache[unit];
+    cache->valid = true;
+    cache->enabled = true;
+    cache->offset = offset;
+    cache->format = format;
+    cache->depth = depth;
+    cache->pitch = pitch;
+    cache->size = size;
+    cache->wrap = wrap;
+    cache->filter = filter;
+}
+
+static void setup_texture_stage_unit(unsigned int unit, NxglBackendTexture *texture, bool allow_cube_map)
+{
+    uint32_t offset = (uint32_t)texture->addr & 0x03ffffff;
+    uint32_t format = texture_stage_format(texture, allow_cube_map);
+    uint32_t depth = texture->depth;
+    uint32_t pitch = texture->pitch << 16;
+    uint32_t size = (texture->width << 16) | texture->height;
+    uint32_t wrap = NXGL_BACKEND_TEXTURE_WRAP_REPEAT;
+    uint32_t filter = 0x04074000;
+    uint32_t *p;
+
+    if (texture_stage_cache_matches(unit, offset, format, depth, pitch, size, wrap, filter)) {
+        return;
+    }
+
+    p = pb_begin();
+    p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(unit), offset, format);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(unit), depth);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(unit), pitch);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_SIZE(unit), size);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(unit), wrap);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(unit), 0x4003ffc0);
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(unit), filter);
     pb_end(p);
+
+    mark_texture_stage_enabled(unit, offset, format, depth, pitch, size, wrap, filter);
+}
+
+static void disable_texture_stage_unit(unsigned int unit)
+{
+    uint32_t *p;
+
+    if (texture_stage_cache[unit].valid && !texture_stage_cache[unit].enabled) {
+        return;
+    }
+
+    p = pb_begin();
+    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(unit), 0x0003ffc0);
+    pb_end(p);
+
+    texture_stage_cache[unit].valid = true;
+    texture_stage_cache[unit].enabled = false;
+}
+
+static void setup_texture_stage0_only(NxglBackendTexture *texture)
+{
+    setup_texture_stage_unit(0, texture, true);
+}
+
+static void setup_texture_stage(NxglBackendTexture *texture)
+{
+    setup_texture_stage_unit(0, texture, true);
+    disable_texture_stage_unit(1);
+    disable_texture_stage_unit(2);
+    disable_texture_stage_unit(3);
 }
 
 static void setup_texture_stage1(NxglBackendTexture *texture)
 {
-    uint32_t *p = pb_begin();
-    uint32_t format = texture->format != 0 ? texture->format : NXGL_BACKEND_TEXTURE_FORMAT_RGBA;
-    p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(1), (uint32_t)texture->addr & 0x03ffffff, format);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(1), texture->depth);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(1), texture->pitch << 16);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_SIZE(1), (texture->width << 16) | texture->height);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(1), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(1), 0x4003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(1), 0x04074000);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(2), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(3), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(2), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_WRAP(3), NXGL_BACKEND_TEXTURE_WRAP_REPEAT);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(2), 0x02022000);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_FILTER(3), 0x02022000);
-    pb_end(p);
+    setup_texture_stage_unit(1, texture, false);
+    disable_texture_stage_unit(2);
+    disable_texture_stage_unit(3);
 }
 
 static void disable_texture_stages(void)
 {
-    uint32_t *p = pb_begin();
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(0), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(1), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(2), 0x0003ffc0);
-    p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(3), 0x0003ffc0);
-    pb_end(p);
+    disable_texture_stage_unit(0);
+    disable_texture_stage_unit(1);
+    disable_texture_stage_unit(2);
+    disable_texture_stage_unit(3);
 }
 
 static void set_attrib_pointer(unsigned int index, unsigned int format, unsigned int size, unsigned int stride, const void *data)
@@ -1292,7 +1375,7 @@ void nxgl_backend_flush(void)
                            batch->scissor, batch->scissor_x, batch->scissor_y,
                            batch->scissor_w, batch->scissor_h);
         if (multitextured) {
-            setup_texture_stage(batch->texture);
+            setup_texture_stage0_only(batch->texture);
             setup_texture_stage1(batch->texture1);
             use_multitexture_shader();
         } else if (cube_textured) {

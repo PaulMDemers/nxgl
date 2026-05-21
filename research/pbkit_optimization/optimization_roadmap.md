@@ -79,12 +79,12 @@ Implemented so far:
 
 - Shader uploads are skipped when the next batch uses the same shader key.
 - Depth/cull/blend/scissor registers are skipped when unchanged.
+- Texture-stage descriptors and disables are skipped per unit when unchanged.
 - Vertex attribute pointers are emitted once per flush instead of once per
   batch.
 
 Remaining:
 
-- Texture-stage descriptor caching per unit.
 - Focused probes that alternate adjacent draw state to catch stale-state bugs.
 
 Expected payoff: lower per-batch overhead and less pushbuffer traffic.

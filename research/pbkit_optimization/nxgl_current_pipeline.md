@@ -56,8 +56,9 @@ needs to be.
 Initial backend caching now skips identical shader uploads and unchanged
 depth/cull/blend/scissor setup within a frame. The shared vertex attribute
 pointers are also emitted once per flush instead of once per batch. Texture
-stage descriptors are still emitted per batch until the unit enable/disable
-interactions get a complete cache key.
+stage descriptors and texture disables are cached per unit, with single-texture
+and multitexture paths using distinct setup helpers so unit enables stay
+explicit.
 
 ## Software/CPU Compatibility Paths
 
@@ -110,7 +111,8 @@ buffers if readback is re-enabled.
    indexed mesh-style submission is not used.
 5. Shader variants are cached by current shader key, but program upload versus
    shader select has not been split yet.
-6. Texture stage state is pushed repeatedly even when unchanged.
+6. Texture stage state is cached per unit, but the descriptor values still use
+   magic constants that need named builders.
 7. `pb_begin()` / `pb_end()` calls are frequent, especially during shader loads,
    texture setup, and per-batch state setup.
 8. The backend waits for `pb_busy()` at flush boundaries, limiting overlap.
