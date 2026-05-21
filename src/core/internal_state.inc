@@ -539,6 +539,7 @@ static GLboolean unpack_lsb_first;
 static uint32_t *shadow_color_buffer;
 static float *shadow_depth_buffer;
 static uint8_t *shadow_stencil_buffer;
+static bool shadow_readback_default_enabled = true;
 static bool shadow_readback_enabled = true;
 static float *accum_buffer;
 static bool native_frame_started;

@@ -86,17 +86,16 @@ render-only demos such as NeHe and most samples.
 
 ## Existing Fast-Mode Hook
 
-NXGL already has `nxglSetReadbackEnabled(GL_FALSE)`. The docs say render-only
-applications can call this after `nxglInit()` to skip the CPU shadow and use
-native filled primitive paths, while readback-dependent APIs report
-`GL_INVALID_OPERATION`.
-
-That is the first lever for samples and demos. The optimization pass should
-make this easier to use and make it obvious in documentation and examples.
+NXGL has both runtime and init-time readback controls. `nxglInitFast()` and
+`nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()` skip CPU
+color/depth/stencil shadow allocation entirely. `nxglSetReadbackEnabled()` can
+still toggle the runtime behavior after init and lazily allocates the shadow
+buffers if readback is re-enabled.
 
 ## Current Bottlenecks
 
-1. CPU shadow allocation and updates are enabled by default.
+1. CPU shadow allocation and updates are enabled by default in compatibility
+   mode, but render-only fast init can skip allocation.
 2. `shadow_fill_bounds()` loops over bounding boxes and runs depth/stencil/blend
    logic in software.
 3. Selection/feedback and pixel-transfer paths force CPU-side projected
@@ -113,4 +112,3 @@ make this easier to use and make it obvious in documentation and examples.
    rather than carried as vertex-program inputs/constants.
 10. Cube/3D texture native presentation is disabled or partial because current
     hardware encoding needs more validation.
-

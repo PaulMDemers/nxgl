@@ -12,6 +12,8 @@
 
 ## Pass 0: Instrument Before Changing Behavior
 
+Status: initial coarse counters are implemented through `NxglPerfCounters`.
+
 Add optional counters behind `NXGL_PERF_OVERLAY` or a new lightweight profiling
 flag:
 
@@ -31,7 +33,11 @@ helps answer reviewer concerns with measurements instead of vibes.
 
 ## Pass 1: Make Render-Only Fast Mode First-Class
 
-Current hook: `nxglSetReadbackEnabled(GL_FALSE)`.
+Status: initial fast init is implemented with `nxglInitFast()` and
+`nxglSetDefaultReadbackEnabled(GL_FALSE)`.
+
+Current hooks: `nxglInitFast()`, `nxglSetDefaultReadbackEnabled(GL_FALSE)`,
+and `nxglSetReadbackEnabled(GL_FALSE)`.
 
 Actions:
 
@@ -156,4 +162,3 @@ After each pass:
 - run LazyFoo GL 50/51 captures if they depend on NXGL
 - add one focused regression probe for the changed path
 - record before/after perf counters in `docs/` or `research/`
-

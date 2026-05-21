@@ -563,8 +563,10 @@ typedef void GLvoid;
 #define GL_SET 0x150F
 
 int nxglInit(void);
+int nxglInitFast(void);
 void nxglShutdown(void);
 void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz);
+void nxglSetDefaultReadbackEnabled(GLboolean enabled);
 void nxglSetReadbackEnabled(GLboolean enabled);
 void nxglSwapBuffers(const char *title, const char *detail);
 

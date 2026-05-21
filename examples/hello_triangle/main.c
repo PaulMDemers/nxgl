@@ -45,7 +45,7 @@ int main(void)
 
     XVideoSetMode(640, 480, 32, REFRESH_DEFAULT);
 
-    if (nxglInit() != 0) {
+    if (nxglInitFast() != 0) {
         return 1;
     }
 

@@ -49,6 +49,12 @@ entry points, backend primitive pushes, shadow/readback work, pixel-transfer
 calls, and texture uploads. Use `nxglResetPerfCounters()` and
 `nxglGetPerfCounters()` around a workload to compare optimization passes.
 
+Render-only applications should prefer `nxglInitFast()` or
+`nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()`. That skips
+allocation of the CPU color/depth/stencil shadow buffers and keeps the
+compatibility/readback path out of the hot loop unless the application opts
+back in with `nxglSetReadbackEnabled(GL_TRUE)`.
+
 ## PBKit Backend
 
 `src/backend/nxgl_backend.h` and `src/backend/nxgl_backend.c` provide the current

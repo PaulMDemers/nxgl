@@ -1,3 +1,54 @@
+static bool allocate_shadow_buffers(void)
+{
+    size_t pixel_count = (size_t)shadow_width * (size_t)shadow_height;
+
+    if (shadow_color_buffer != NULL && shadow_depth_buffer != NULL && shadow_stencil_buffer != NULL) {
+        return true;
+    }
+
+    if (shadow_color_buffer == NULL) {
+        shadow_color_buffer = (uint32_t *)MmAllocateContiguousMemoryEx(pixel_count * sizeof(uint32_t),
+                                                                        0,
+                                                                        SHADOW_MAXRAM,
+                                                                        0,
+                                                                        PAGE_READWRITE);
+        if (shadow_color_buffer == NULL) {
+            return false;
+        }
+    }
+    if (shadow_depth_buffer == NULL) {
+        shadow_depth_buffer = (float *)MmAllocateContiguousMemoryEx(pixel_count * sizeof(float),
+                                                                    0,
+                                                                    SHADOW_MAXRAM,
+                                                                    0,
+                                                                    PAGE_READWRITE);
+        if (shadow_depth_buffer == NULL) {
+            MmFreeContiguousMemory(shadow_color_buffer);
+            shadow_color_buffer = NULL;
+            return false;
+        }
+    }
+    if (shadow_stencil_buffer == NULL) {
+        shadow_stencil_buffer = (uint8_t *)MmAllocateContiguousMemoryEx(pixel_count * sizeof(uint8_t),
+                                                                        0,
+                                                                        SHADOW_MAXRAM,
+                                                                        0,
+                                                                        PAGE_READWRITE);
+        if (shadow_stencil_buffer == NULL) {
+            MmFreeContiguousMemory(shadow_depth_buffer);
+            shadow_depth_buffer = NULL;
+            MmFreeContiguousMemory(shadow_color_buffer);
+            shadow_color_buffer = NULL;
+            return false;
+        }
+    }
+
+    shadow_clear(clear_color);
+    shadow_clear_depth(depth_clear_value);
+    shadow_clear_stencil((uint8_t)(stencil_clear_value & 0xff));
+    return true;
+}
+
 int nxglInit(void)
 {
     int status;
@@ -213,7 +264,7 @@ int nxglInit(void)
     current_raster_position[3] = 1.0f;
     current_raster_position_valid = true;
     render_mode = GL_RENDER;
-    shadow_readback_enabled = true;
+    shadow_readback_enabled = shadow_readback_default_enabled;
     selection_buffer = NULL;
     selection_buffer_size = 0;
     selection_write_count = 0;
@@ -254,43 +305,17 @@ int nxglInit(void)
         nxgl_backend_shutdown();
         return 1;
     }
-    shadow_color_buffer = (uint32_t *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(uint32_t),
-                                                                    0,
-                                                                    SHADOW_MAXRAM,
-                                                                    0,
-                                                                    PAGE_READWRITE);
-    if (shadow_color_buffer == NULL) {
+    if (shadow_readback_enabled && !allocate_shadow_buffers()) {
         nxgl_backend_shutdown();
         return 1;
     }
-    shadow_depth_buffer = (float *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(float),
-                                                                0,
-                                                                SHADOW_MAXRAM,
-                                                                0,
-                                                                PAGE_READWRITE);
-    if (shadow_depth_buffer == NULL) {
-        MmFreeContiguousMemory(shadow_color_buffer);
-        shadow_color_buffer = NULL;
-        nxgl_backend_shutdown();
-        return 1;
-    }
-    shadow_stencil_buffer = (uint8_t *)MmAllocateContiguousMemoryEx((size_t)shadow_width * (size_t)shadow_height * sizeof(uint8_t),
-                                                                    0,
-                                                                    SHADOW_MAXRAM,
-                                                                    0,
-                                                                    PAGE_READWRITE);
-    if (shadow_stencil_buffer == NULL) {
-        MmFreeContiguousMemory(shadow_depth_buffer);
-        shadow_depth_buffer = NULL;
-        MmFreeContiguousMemory(shadow_color_buffer);
-        shadow_color_buffer = NULL;
-        nxgl_backend_shutdown();
-        return 1;
-    }
-    shadow_clear(clear_color);
-    shadow_clear_depth(depth_clear_value);
-    shadow_clear_stencil((uint8_t)(stencil_clear_value & 0xff));
     return 0;
+}
+
+int nxglInitFast(void)
+{
+    nxglSetDefaultReadbackEnabled(GL_FALSE);
+    return nxglInit();
 }
 
 void nxglShutdown(void)
@@ -329,6 +354,11 @@ void nxglSetCamera(float x, float y, float z, float rx, float ry, float rz)
     nxgl_backend_set_camera(x, y, z, rx, ry, rz);
 }
 
+void nxglSetDefaultReadbackEnabled(GLboolean enabled)
+{
+    shadow_readback_default_enabled = enabled != GL_FALSE;
+}
+
 void nxglSetReadbackEnabled(GLboolean enabled)
 {
     bool next = enabled != GL_FALSE;
@@ -337,9 +367,11 @@ void nxglSetReadbackEnabled(GLboolean enabled)
     }
     shadow_readback_enabled = next;
     if (shadow_readback_enabled) {
-        shadow_clear(clear_color);
-        shadow_clear_depth(depth_clear_value);
-        shadow_clear_stencil((uint8_t)(stencil_clear_value & 0xff));
+        if (!allocate_shadow_buffers()) {
+            shadow_readback_enabled = false;
+            set_error(GL_OUT_OF_MEMORY);
+            return;
+        }
     }
 }
 

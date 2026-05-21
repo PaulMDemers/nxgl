@@ -52,10 +52,11 @@ Then include the API from application code:
 ```
 
 For render-only applications that do not call `glReadPixels`, pixel transfer,
-or accumulation APIs, disable the CPU readback shadow after `nxglInit()`:
+or accumulation APIs, use the fast initializer to skip CPU readback shadow
+allocation:
 
 ```c
-nxglSetReadbackEnabled(GL_FALSE);
+nxglInitFast();
 ```
 
 Readback is enabled by default for compatibility and for the validation probes.
@@ -63,6 +64,11 @@ With readback disabled, filled triangle and quad primitives can take a native
 fast path, while readback-dependent APIs such as `glReadPixels`,
 `glDrawPixels`, `glCopyPixels`, `glBitmap`, and `glAccum` report
 `GL_INVALID_OPERATION`.
+
+Applications that need custom startup flow can call
+`nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()`, or call
+`nxglSetReadbackEnabled(GL_FALSE)` after init when only the runtime behavior
+should change.
 
 For optimization work, NXGL exposes lightweight counters:
 
