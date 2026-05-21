@@ -156,6 +156,8 @@ Risk: hardware-specific texture descriptor behavior. Keep focused probes.
 Actions:
 
 - Split CPU readback/shadow code into a clearly named module or section.
+- Split texture lifecycle, validation/conversion, upload/copy, and compressed
+  texture APIs into separate core sections.
 - Add docs that call it "compatibility/readback path", not "renderer".
 - Make APIs that force compatibility mode explicit in documentation.
 - Add sample guidance:

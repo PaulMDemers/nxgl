@@ -27,8 +27,14 @@ keep file-local state and helpers. The implementation body is split under
   read/draw/copy pixels, select, and feedback APIs
 - `state_array_list_api.inc`: enables, attrib stacks, client arrays, draw
   arrays/elements, and display lists
-- `texture_api.inc`: texture object APIs, texenv, pixel packing, and image
-  conversion
+- `texture_api.inc`: wrapper for the texture implementation sections
+- `texture_lifecycle_env.inc`: texture name/bind/residency APIs and texenv
+  state
+- `texture_validation_convert.inc`: texture/pixel validation, packing, and
+  conversion helpers
+- `texture_upload_copy.inc`: uncompressed texture parameter, image,
+  sub-image, copy, 1D/2D/3D, and LOD APIs
+- `texture_compressed_api.inc`: compressed texture image and sub-image APIs
 
 Together, these sections own OpenGL-like behavior:
 
