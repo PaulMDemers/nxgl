@@ -79,8 +79,9 @@ nxglResetPerfCounters();
 nxglGetPerfCounters(&counters);
 ```
 
-The counters distinguish backend primitive pushes, shadow/readback work,
-pixel-transfer calls, texture uploads, and frame-level activity.
+The counters distinguish backend primitive pushes, backend shader/render-state
+and texture-stage cache behavior, shadow/readback work, pixel-transfer calls,
+texture uploads, and frame-level activity.
 
 ## Documentation
 

@@ -588,6 +588,14 @@ typedef struct NxglPerfCounters {
     uint32_t texture_sub_uploads;
     uint32_t compressed_texture_uploads;
     uint32_t compressed_texture_sub_uploads;
+    uint32_t backend_shader_uploads;
+    uint32_t backend_shader_cache_hits;
+    uint32_t backend_render_state_uploads;
+    uint32_t backend_render_state_cache_hits;
+    uint32_t backend_texture_stage_uploads;
+    uint32_t backend_texture_stage_cache_hits;
+    uint32_t backend_texture_stage_disables;
+    uint32_t backend_texture_stage_disable_hits;
 } NxglPerfCounters;
 
 void nxglResetPerfCounters(void);

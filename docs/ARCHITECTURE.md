@@ -45,8 +45,9 @@ This layer should remain backend-aware only through the backend contract.
 
 `NxglPerfCounters` exposes lightweight runtime counters for optimization work.
 They are intentionally coarse: frame swaps, clears, immediate/array/list draw
-entry points, backend primitive pushes, shadow/readback work, pixel-transfer
-calls, and texture uploads. Use `nxglResetPerfCounters()` and
+entry points, backend primitive pushes, backend shader/render-state and
+texture-stage cache behavior, shadow/readback work, pixel-transfer calls, and
+texture uploads. Use `nxglResetPerfCounters()` and
 `nxglGetPerfCounters()` around a workload to compare optimization passes.
 
 Render-only applications should prefer `nxglInitFast()` or

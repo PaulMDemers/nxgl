@@ -70,6 +70,17 @@ typedef enum NxglBackendTextureEnvMode {
     NXGL_BACKEND_TEXENV_INTERPOLATE
 } NxglBackendTextureEnvMode;
 
+typedef struct NxglBackendPerfCounters {
+    uint32_t shader_uploads;
+    uint32_t shader_cache_hits;
+    uint32_t render_state_uploads;
+    uint32_t render_state_cache_hits;
+    uint32_t texture_stage_uploads;
+    uint32_t texture_stage_cache_hits;
+    uint32_t texture_stage_disables;
+    uint32_t texture_stage_disable_hits;
+} NxglBackendPerfCounters;
+
 int nxgl_backend_init(void);
 void nxgl_backend_shutdown(void);
 void nxgl_backend_begin(uint32_t clear_color, bool blend);
@@ -98,6 +109,8 @@ void nxgl_backend_set_texture_env(NxglBackendTextureEnvMode mode, NxglBackendCol
 void nxgl_backend_flush(void);
 int nxgl_backend_back_buffer_width(void);
 int nxgl_backend_back_buffer_height(void);
+void nxgl_backend_reset_perf_counters(void);
+void nxgl_backend_get_perf_counters(NxglBackendPerfCounters *counters);
 void nxgl_backend_finish(const char *title, const char *detail);
 
 #endif

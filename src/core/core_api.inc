@@ -378,14 +378,26 @@ void nxglSetReadbackEnabled(GLboolean enabled)
 void nxglResetPerfCounters(void)
 {
     memset(&perf_counters, 0, sizeof(perf_counters));
+    nxgl_backend_reset_perf_counters();
 }
 
 void nxglGetPerfCounters(NxglPerfCounters *counters)
 {
+    NxglBackendPerfCounters backend_counters;
+
     if (counters == NULL) {
         return;
     }
     *counters = perf_counters;
+    nxgl_backend_get_perf_counters(&backend_counters);
+    counters->backend_shader_uploads = backend_counters.shader_uploads;
+    counters->backend_shader_cache_hits = backend_counters.shader_cache_hits;
+    counters->backend_render_state_uploads = backend_counters.render_state_uploads;
+    counters->backend_render_state_cache_hits = backend_counters.render_state_cache_hits;
+    counters->backend_texture_stage_uploads = backend_counters.texture_stage_uploads;
+    counters->backend_texture_stage_cache_hits = backend_counters.texture_stage_cache_hits;
+    counters->backend_texture_stage_disables = backend_counters.texture_stage_disables;
+    counters->backend_texture_stage_disable_hits = backend_counters.texture_stage_disable_hits;
 }
 
 void nxglSwapBuffers(const char *title, const char *detail)

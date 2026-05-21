@@ -150,6 +150,7 @@ static float projection_far_z = 100.0f;
 static NxglBackendShaderCache shader_cache;
 static NxglBackendRenderStateCache render_state_cache;
 static NxglBackendTextureStageCache texture_stage_cache[4];
+static NxglBackendPerfCounters backend_perf_counters;
 
 static void invalidate_backend_state_cache(void)
 {
@@ -266,6 +267,8 @@ static void load_color_shader(void)
         #include "../common3d/vs.inl"
     };
 
+    ++backend_perf_counters.shader_uploads;
+
     p = pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
@@ -324,6 +327,8 @@ static void load_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor
         #include "nxgl_tex_vs.inl"
     };
 
+    ++backend_perf_counters.shader_uploads;
+
     p = pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
@@ -378,6 +383,8 @@ static void load_multitexture_shader(void)
         #include "nxgl_tex2_vs.inl"
     };
 
+    ++backend_perf_counters.shader_uploads;
+
     p = pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
@@ -410,6 +417,8 @@ static void load_cube_texture_shader(void)
         #include "nxgl_tex_vs.inl"
     };
 
+    ++backend_perf_counters.shader_uploads;
+
     p = pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
@@ -441,6 +450,8 @@ static void load_texture3d_shader(void)
     uint32_t vs_program[] = {
         #include "nxgl_tex_vs.inl"
     };
+
+    ++backend_perf_counters.shader_uploads;
 
     p = pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
@@ -490,6 +501,7 @@ static void mark_shader_cache(NxglBackendShaderKind kind,
 static void use_color_shader(void)
 {
     if (shader_cache_matches(NXGL_BACKEND_SHADER_COLOR, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        ++backend_perf_counters.shader_cache_hits;
         return;
     }
     load_color_shader();
@@ -500,6 +512,7 @@ static void use_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor 
 {
     uint32_t env_key = packed_color(env_color);
     if (shader_cache_matches(NXGL_BACKEND_SHADER_TEXTURE, mode, env_key)) {
+        ++backend_perf_counters.shader_cache_hits;
         return;
     }
     load_texture_shader(mode, env_color);
@@ -509,6 +522,7 @@ static void use_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor 
 static void use_multitexture_shader(void)
 {
     if (shader_cache_matches(NXGL_BACKEND_SHADER_MULTITEXTURE, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        ++backend_perf_counters.shader_cache_hits;
         return;
     }
     load_multitexture_shader();
@@ -518,6 +532,7 @@ static void use_multitexture_shader(void)
 static void use_cube_texture_shader(void)
 {
     if (shader_cache_matches(NXGL_BACKEND_SHADER_CUBE, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        ++backend_perf_counters.shader_cache_hits;
         return;
     }
     load_cube_texture_shader();
@@ -527,6 +542,7 @@ static void use_cube_texture_shader(void)
 static void use_texture3d_shader(void)
 {
     if (shader_cache_matches(NXGL_BACKEND_SHADER_TEXTURE3D, NXGL_BACKEND_TEXENV_MODULATE, 0)) {
+        ++backend_perf_counters.shader_cache_hits;
         return;
     }
     load_texture3d_shader();
@@ -564,8 +580,11 @@ static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
         render_state_cache.clip_y1 == y1 &&
         render_state_cache.clip_x2 == x2 &&
         render_state_cache.clip_y2 == y2) {
+        ++backend_perf_counters.render_state_cache_hits;
         return;
     }
+
+    ++backend_perf_counters.render_state_uploads;
 
     p = pb_begin();
     p = pb_push1(p, NV097_SET_DEPTH_TEST_ENABLE, depth_test ? 1 : 0);
@@ -664,8 +683,11 @@ static void setup_texture_stage_unit(unsigned int unit, NxglBackendTexture *text
     uint32_t *p;
 
     if (texture_stage_cache_matches(unit, offset, format, depth, pitch, size, wrap, filter)) {
+        ++backend_perf_counters.texture_stage_cache_hits;
         return;
     }
+
+    ++backend_perf_counters.texture_stage_uploads;
 
     p = pb_begin();
     p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(unit), offset, format);
@@ -685,8 +707,11 @@ static void disable_texture_stage_unit(unsigned int unit)
     uint32_t *p;
 
     if (texture_stage_cache[unit].valid && !texture_stage_cache[unit].enabled) {
+        ++backend_perf_counters.texture_stage_disable_hits;
         return;
     }
+
+    ++backend_perf_counters.texture_stage_disables;
 
     p = pb_begin();
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(unit), 0x0003ffc0);
@@ -1419,6 +1444,19 @@ int nxgl_backend_back_buffer_width(void)
 int nxgl_backend_back_buffer_height(void)
 {
     return back_height;
+}
+
+void nxgl_backend_reset_perf_counters(void)
+{
+    memset(&backend_perf_counters, 0, sizeof(backend_perf_counters));
+}
+
+void nxgl_backend_get_perf_counters(NxglBackendPerfCounters *counters)
+{
+    if (counters == NULL) {
+        return;
+    }
+    *counters = backend_perf_counters;
 }
 
 void nxgl_backend_finish(const char *title, const char *detail)

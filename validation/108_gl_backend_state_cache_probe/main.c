@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static bool results[10];
+static bool results[11];
 static GLuint tex_red;
 static GLuint tex_green;
 static GLuint tex_blue;
@@ -314,6 +314,21 @@ static void run_probe(void)
     read_center(pixel);
     ok = pixel_rgb(pixel, 0, 255, 0) && consume_error(GL_NO_ERROR);
     expect_bool("scissor disable transition", ok, 9);
+
+    {
+        NxglPerfCounters counters;
+        nxglGetPerfCounters(&counters);
+        ok = counters.backend_shader_uploads > 0 &&
+             counters.backend_shader_cache_hits > 0 &&
+             counters.backend_render_state_uploads > 0 &&
+             counters.backend_render_state_cache_hits > 0 &&
+             counters.backend_texture_stage_uploads > 0 &&
+             counters.backend_texture_stage_cache_hits > 0 &&
+             counters.backend_texture_stage_disables > 0 &&
+             counters.backend_texture_stage_disable_hits > 0 &&
+             consume_error(GL_NO_ERROR);
+        expect_bool("backend cache perf counters", ok, 10);
+    }
 }
 
 static void draw_result_bar(float x, bool pass)
@@ -334,7 +349,7 @@ static void draw_result_bar(float x, bool pass)
 
 static bool all_passed(void)
 {
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 11; ++i) {
         if (!results[i]) return false;
     }
     return true;
@@ -352,6 +367,7 @@ int main(void)
 
     memset(results, 0, sizeof(results));
     setup_textures();
+    nxglResetPerfCounters();
     run_probe();
 
     for (;;) {
@@ -362,8 +378,8 @@ int main(void)
                   all_passed() ? 0.45f : 0.08f,
                   all_passed() ? 0.9f : 0.08f,
                   1.0f);
-        for (int i = 0; i < 10; ++i) {
-            draw_result_bar(-2.25f + (float)i * 0.50f, results[i]);
+        for (int i = 0; i < 11; ++i) {
+            draw_result_bar(-2.50f + (float)i * 0.48f, results[i]);
         }
 
         nxglSwapBuffers("NXGL backend cache", all_passed() ? "all checks passed" : "backend cache check failed");
