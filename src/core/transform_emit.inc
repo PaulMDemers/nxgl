@@ -2306,3 +2306,59 @@ static void emit_array_vertices(GLenum mode, const GLint *indices, GLsizei count
     free(vertices);
 }
 
+static bool emit_array_indexed_elements_fast(GLenum mode, const GLint *indices, GLsizei count)
+{
+    GLint min_index;
+    GLint max_index;
+    GLsizei unique_count;
+    NxglBackendVertex *vertices;
+    uint16_t *local_indices;
+
+    if (mode != GL_TRIANGLES || indices == NULL || count < 3 ||
+        !native_fast_fill_enabled() || lighting_enabled || shade_model != GL_SMOOTH) {
+        return false;
+    }
+    count -= count % 3;
+
+    min_index = indices[0];
+    max_index = indices[0];
+    for (GLsizei i = 1; i < count; ++i) {
+        if (indices[i] < min_index) {
+            min_index = indices[i];
+        }
+        if (indices[i] > max_index) {
+            max_index = indices[i];
+        }
+    }
+    if (min_index < 0) {
+        return false;
+    }
+    unique_count = max_index - min_index + 1;
+    if (unique_count <= 0 || unique_count > 65535) {
+        return false;
+    }
+
+    vertices = (NxglBackendVertex *)malloc((size_t)unique_count * sizeof(NxglBackendVertex));
+    local_indices = (uint16_t *)malloc((size_t)count * sizeof(uint16_t));
+    if (vertices == NULL || local_indices == NULL) {
+        free(vertices);
+        free(local_indices);
+        set_error(GL_OUT_OF_MEMORY);
+        return true;
+    }
+
+    for (GLsizei i = 0; i < unique_count; ++i) {
+        vertices[i] = read_array_vertex(min_index + i);
+    }
+    for (GLsizei i = 0; i < count; ++i) {
+        local_indices[i] = (uint16_t)(indices[i] - min_index);
+    }
+
+    ensure_native_frame_started();
+    nxgl_backend_push_indexed_triangles(vertices, (unsigned int)unique_count, local_indices, (unsigned int)count);
+    perf_backend_primitive_vertices((uint32_t)unique_count);
+
+    free(vertices);
+    free(local_indices);
+    return true;
+}

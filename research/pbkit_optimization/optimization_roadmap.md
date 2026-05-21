@@ -126,12 +126,17 @@ Implemented so far:
 - Fast-mode `GL_TRIANGLE_STRIP`, `GL_TRIANGLE_FAN`, and `GL_QUAD_STRIP`
   submissions can stay as native strip/fan batches for compact primitive runs,
   avoiding avoidable CPU decomposition.
+- Fast-mode `glDrawElements(GL_TRIANGLES)` can submit reused client-array
+  vertices through a backend index buffer and `NV20_TCL_PRIMITIVE_3D_INDEX_DATA`
+  when the element stream can be represented as packed 16-bit index pairs.
+  Odd effective triangle index counts pad the final packed pair; the extra
+  vertex is incomplete under `TRIANGLES` and is discarded at `END`.
 
 Actions:
 
-- Add an optional backend index buffer path.
+- Extend indexed submission to more primitive decomposition paths.
 - For quads, quad strips, fans, and display-list replay, keep unique vertices
-  and emit indices.
+  and emit indices where the native index path is profitable.
 - Preserve current array path as fallback.
 - Benchmark NeHe cubes and repeated textured quads.
 

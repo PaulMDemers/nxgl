@@ -972,7 +972,9 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *indic
             expanded[i] = (GLint)((const GLuint *)indices)[i];
         }
     }
-    emit_array_vertices(mode, expanded, count);
+    if (!emit_array_indexed_elements_fast(mode, expanded, count)) {
+        emit_array_vertices(mode, expanded, count);
+    }
     free(expanded);
 }
 

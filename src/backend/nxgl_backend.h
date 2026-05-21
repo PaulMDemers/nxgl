@@ -107,6 +107,10 @@ void nxgl_backend_set_camera(float x, float y, float z, float rx, float ry, floa
 void nxgl_backend_push_triangle(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c);
 void nxgl_backend_push_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d);
 void nxgl_backend_push_primitive(NxglBackendPrimitive primitive, const NxglBackendVertex *vertices, unsigned int count);
+void nxgl_backend_push_indexed_triangles(const NxglBackendVertex *vertices,
+                                         unsigned int unique_vertex_count,
+                                         const uint16_t *indices,
+                                         unsigned int index_count);
 int nxgl_backend_texture_create_rgba(NxglBackendTexture *texture, uint16_t width, uint16_t height, const uint8_t *rgba);
 int nxgl_backend_texture_create_rgba3d(NxglBackendTexture *texture, uint16_t width, uint16_t height, uint16_t depth, const uint8_t *rgba);
 int nxgl_backend_texture_create_cube_rgba(NxglBackendTexture *texture, uint16_t size, const uint8_t *faces[6]);
