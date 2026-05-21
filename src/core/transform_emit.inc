@@ -148,6 +148,10 @@ static bool copy_shadow_rgba(uint8_t *dst, GLint x, GLint y, GLsizei width, GLsi
     if (dst == NULL) {
         return false;
     }
+    if (!shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
+        return false;
+    }
     if (shadow_color_buffer == NULL) {
         set_error(GL_INVALID_OPERATION);
         return false;

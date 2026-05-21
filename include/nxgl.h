@@ -579,6 +579,10 @@ typedef struct NxglPerfCounters {
     uint32_t display_list_calls;
     uint32_t backend_batches;
     uint32_t backend_vertices;
+    uint32_t shadow_buffer_allocations;
+    uint32_t shadow_buffer_allocation_bytes;
+    uint32_t shadow_buffer_frees;
+    uint32_t shadow_buffer_free_bytes;
     uint32_t shadow_primitives;
     uint32_t shadow_fragments;
     uint32_t read_pixels_calls;

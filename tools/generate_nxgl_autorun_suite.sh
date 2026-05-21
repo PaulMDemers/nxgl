@@ -16,7 +16,7 @@ sources="$gen_dir/generated_sources.mk"
 printf 'AUTORUN_PROBE_SRCS := \\\n' >> "$sources"
 
 find "$validation_dir" -maxdepth 1 -type d | sed "s#^$validation_dir/##" | \
-    grep -E '^(2[7-9]|[3-9][0-9]|10[0-8])_gl' | sort -V | \
+    grep -E '^(2[7-9]|[3-9][0-9]|10[0-9])_gl' | sort -V | \
     while IFS= read -r probe; do
         safe="$(printf '%s' "$probe" | tr -c 'A-Za-z0-9' '_')"
         symbol="probe_${safe}_main"

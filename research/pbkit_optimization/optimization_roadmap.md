@@ -25,6 +25,7 @@ flag:
 - shader program uploads and cache hits
 - texture-stage uploads/disables and cache hits
 - pbkit command blocks started
+- CPU shadow buffer allocations/frees
 - CPU shadow primitives touched
 - shadow pixels touched
 - readback/pixel-transfer API calls
@@ -35,23 +36,32 @@ helps answer reviewer concerns with measurements instead of vibes.
 
 ## Pass 1: Make Render-Only Fast Mode First-Class
 
-Status: initial fast init is implemented with `nxglInitFast()` and
-`nxglSetDefaultReadbackEnabled(GL_FALSE)`.
+Status: fast init and runtime readback toggling are implemented and covered by
+`109_gl_fast_readback_probe`.
 
 Current hooks: `nxglInitFast()`, `nxglSetDefaultReadbackEnabled(GL_FALSE)`,
 and `nxglSetReadbackEnabled(GL_FALSE)`.
 
 Actions:
 
-- Add a documented compile-time or init-time fast-mode helper, e.g.
-  `nxglInitFast()` or `nxglSetDefaultReadbackEnabled(GL_FALSE)` before
-  allocation.
+- Add a documented compile-time or init-time fast-mode helper.
 - Update NXGL examples and NeHe NXGL demos to disable readback unless the demo
   calls readback/pixel APIs.
-- In fast mode, avoid allocating color/depth/stencil shadow buffers at init.
-  Today readback is toggled after init, so the memory cost is already paid.
+- In fast mode, avoid allocating color/depth/stencil shadow buffers at init and
+  free them when readback is disabled at runtime.
 - Add validation tests proving readback APIs return `GL_INVALID_OPERATION` in
   fast mode.
+
+Implemented so far:
+
+- `nxglInitFast()` and `nxglSetDefaultReadbackEnabled(GL_FALSE)` skip
+  color/depth/stencil shadow allocation before init.
+- `nxglSetReadbackEnabled(GL_FALSE)` frees any existing shadow buffers.
+- `nxglSetReadbackEnabled(GL_TRUE)` reallocates fresh shadows and clears them
+  to the current clear values.
+- `109_gl_fast_readback_probe` covers fast init, native render without shadow
+  allocation, readback-dependent API rejection, and runtime free/reallocation
+  counters.
 
 Expected payoff: removes the largest CPU/memory cost from demos without
 changing compatibility mode.

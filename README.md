@@ -67,8 +67,9 @@ fast path, while readback-dependent APIs such as `glReadPixels`,
 
 Applications that need custom startup flow can call
 `nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()`, or call
-`nxglSetReadbackEnabled(GL_FALSE)` after init when only the runtime behavior
-should change.
+`nxglSetReadbackEnabled(GL_FALSE)` after init. Disabling readback at runtime
+frees any CPU color/depth/stencil shadow buffers; enabling it again reallocates
+and clears them to the current clear values.
 
 For optimization work, NXGL exposes lightweight counters:
 
@@ -80,8 +81,9 @@ nxglGetPerfCounters(&counters);
 ```
 
 The counters distinguish backend primitive pushes, backend shader/render-state
-and texture-stage cache behavior, shadow/readback work, pixel-transfer calls,
-texture uploads, and frame-level activity.
+and texture-stage cache behavior, shadow/readback buffer allocation/free
+activity, shadow fragments, pixel-transfer calls, texture uploads, and
+frame-level activity.
 
 ## Documentation
 

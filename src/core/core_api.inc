@@ -1,3 +1,27 @@
+static void free_shadow_buffers(void)
+{
+    size_t pixel_count = (size_t)shadow_width * (size_t)shadow_height;
+
+    if (shadow_stencil_buffer != NULL) {
+        MmFreeContiguousMemory(shadow_stencil_buffer);
+        shadow_stencil_buffer = NULL;
+        ++perf_counters.shadow_buffer_frees;
+        perf_counters.shadow_buffer_free_bytes += (uint32_t)(pixel_count * sizeof(uint8_t));
+    }
+    if (shadow_depth_buffer != NULL) {
+        MmFreeContiguousMemory(shadow_depth_buffer);
+        shadow_depth_buffer = NULL;
+        ++perf_counters.shadow_buffer_frees;
+        perf_counters.shadow_buffer_free_bytes += (uint32_t)(pixel_count * sizeof(float));
+    }
+    if (shadow_color_buffer != NULL) {
+        MmFreeContiguousMemory(shadow_color_buffer);
+        shadow_color_buffer = NULL;
+        ++perf_counters.shadow_buffer_frees;
+        perf_counters.shadow_buffer_free_bytes += (uint32_t)(pixel_count * sizeof(uint32_t));
+    }
+}
+
 static bool allocate_shadow_buffers(void)
 {
     size_t pixel_count = (size_t)shadow_width * (size_t)shadow_height;
@@ -15,6 +39,8 @@ static bool allocate_shadow_buffers(void)
         if (shadow_color_buffer == NULL) {
             return false;
         }
+        ++perf_counters.shadow_buffer_allocations;
+        perf_counters.shadow_buffer_allocation_bytes += (uint32_t)(pixel_count * sizeof(uint32_t));
     }
     if (shadow_depth_buffer == NULL) {
         shadow_depth_buffer = (float *)MmAllocateContiguousMemoryEx(pixel_count * sizeof(float),
@@ -23,10 +49,11 @@ static bool allocate_shadow_buffers(void)
                                                                     0,
                                                                     PAGE_READWRITE);
         if (shadow_depth_buffer == NULL) {
-            MmFreeContiguousMemory(shadow_color_buffer);
-            shadow_color_buffer = NULL;
+            free_shadow_buffers();
             return false;
         }
+        ++perf_counters.shadow_buffer_allocations;
+        perf_counters.shadow_buffer_allocation_bytes += (uint32_t)(pixel_count * sizeof(float));
     }
     if (shadow_stencil_buffer == NULL) {
         shadow_stencil_buffer = (uint8_t *)MmAllocateContiguousMemoryEx(pixel_count * sizeof(uint8_t),
@@ -35,12 +62,11 @@ static bool allocate_shadow_buffers(void)
                                                                         0,
                                                                         PAGE_READWRITE);
         if (shadow_stencil_buffer == NULL) {
-            MmFreeContiguousMemory(shadow_depth_buffer);
-            shadow_depth_buffer = NULL;
-            MmFreeContiguousMemory(shadow_color_buffer);
-            shadow_color_buffer = NULL;
+            free_shadow_buffers();
             return false;
         }
+        ++perf_counters.shadow_buffer_allocations;
+        perf_counters.shadow_buffer_allocation_bytes += (uint32_t)(pixel_count * sizeof(uint8_t));
     }
 
     shadow_clear(clear_color);
@@ -320,18 +346,7 @@ int nxglInitFast(void)
 
 void nxglShutdown(void)
 {
-    if (shadow_stencil_buffer != NULL) {
-        MmFreeContiguousMemory(shadow_stencil_buffer);
-        shadow_stencil_buffer = NULL;
-    }
-    if (shadow_depth_buffer != NULL) {
-        MmFreeContiguousMemory(shadow_depth_buffer);
-        shadow_depth_buffer = NULL;
-    }
-    if (shadow_color_buffer != NULL) {
-        MmFreeContiguousMemory(shadow_color_buffer);
-        shadow_color_buffer = NULL;
-    }
+    free_shadow_buffers();
     free(accum_buffer);
     accum_buffer = NULL;
     for (int i = 1; i < 16; ++i) {
@@ -372,6 +387,8 @@ void nxglSetReadbackEnabled(GLboolean enabled)
             set_error(GL_OUT_OF_MEMORY);
             return;
         }
+    } else {
+        free_shadow_buffers();
     }
 }
 
@@ -1605,6 +1622,10 @@ void glClear(uint32_t mask)
     }
     if ((mask & ~valid_mask) != 0u) {
         set_error(GL_INVALID_VALUE);
+        return;
+    }
+    if ((mask & GL_ACCUM_BUFFER_BIT) != 0 && !shadow_readback_enabled) {
+        set_error(GL_INVALID_OPERATION);
         return;
     }
 

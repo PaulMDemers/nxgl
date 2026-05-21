@@ -52,15 +52,17 @@ This layer should remain backend-aware only through the backend contract.
 `NxglPerfCounters` exposes lightweight runtime counters for optimization work.
 They are intentionally coarse: frame swaps, clears, immediate/array/list draw
 entry points, backend primitive pushes, backend shader/render-state and
-texture-stage cache behavior, shadow/readback work, pixel-transfer calls, and
-texture uploads. Use `nxglResetPerfCounters()` and
+texture-stage cache behavior, shadow/readback buffer allocation/free activity,
+shadow fragments, pixel-transfer calls, and texture uploads. Use `nxglResetPerfCounters()` and
 `nxglGetPerfCounters()` around a workload to compare optimization passes.
 
 Render-only applications should prefer `nxglInitFast()` or
 `nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()`. That skips
 allocation of the CPU color/depth/stencil shadow buffers and keeps the
 compatibility/readback path out of the hot loop unless the application opts
-back in with `nxglSetReadbackEnabled(GL_TRUE)`.
+back in with `nxglSetReadbackEnabled(GL_TRUE)`. Disabling readback after
+startup frees existing shadow buffers; re-enabling it allocates fresh shadows
+cleared to the current clear values.
 
 ## PBKit Backend
 
