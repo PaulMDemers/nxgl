@@ -2308,17 +2308,57 @@ static void emit_array_vertices(GLenum mode, const GLint *indices, GLsizei count
 
 static bool emit_array_indexed_elements_fast(GLenum mode, const GLint *indices, GLsizei count)
 {
+    NxglBackendPrimitive primitive;
     GLint min_index;
     GLint max_index;
     GLsizei unique_count;
     NxglBackendVertex *vertices;
     uint16_t *local_indices;
 
-    if (mode != GL_TRIANGLES || indices == NULL || count < 3 ||
+    if (indices == NULL || count <= 0 ||
         !native_fast_fill_enabled() || lighting_enabled || shade_model != GL_SMOOTH) {
         return false;
     }
-    count -= count % 3;
+
+    switch (mode) {
+    case GL_TRIANGLES:
+        count -= count % 3;
+        if (count < 3) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_TRIANGLES;
+        break;
+    case GL_QUADS:
+        count -= count % 4;
+        if (count < 4) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_QUADS;
+        break;
+    case GL_TRIANGLE_STRIP:
+        if (count < 3) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_TRIANGLE_STRIP;
+        break;
+    case GL_TRIANGLE_FAN:
+        if (count < 3) {
+            return true;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_TRIANGLE_FAN;
+        break;
+    case GL_QUAD_STRIP:
+        if (count < 4) {
+            return true;
+        }
+        if ((count & 1) != 0) {
+            --count;
+        }
+        primitive = NXGL_BACKEND_PRIMITIVE_QUAD_STRIP;
+        break;
+    default:
+        return false;
+    }
 
     min_index = indices[0];
     max_index = indices[0];
@@ -2355,7 +2395,11 @@ static bool emit_array_indexed_elements_fast(GLenum mode, const GLint *indices, 
     }
 
     ensure_native_frame_started();
-    nxgl_backend_push_indexed_triangles(vertices, (unsigned int)unique_count, local_indices, (unsigned int)count);
+    if (!nxgl_backend_push_indexed_primitive(primitive, vertices, (unsigned int)unique_count, local_indices, (unsigned int)count)) {
+        free(vertices);
+        free(local_indices);
+        return false;
+    }
     perf_backend_primitive_vertices((uint32_t)unique_count);
 
     free(vertices);

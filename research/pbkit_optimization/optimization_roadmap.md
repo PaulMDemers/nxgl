@@ -131,12 +131,14 @@ Implemented so far:
   when the element stream can be represented as packed 16-bit index pairs.
   Odd effective triangle index counts pad the final packed pair; the extra
   vertex is incomplete under `TRIANGLES` and is discarded at `END`.
+- The same backend index-data path now covers compatible fast-mode
+  `GL_QUADS`, `GL_TRIANGLE_STRIP`, `GL_TRIANGLE_FAN`, and `GL_QUAD_STRIP`
+  element draws.
 
 Actions:
 
-- Extend indexed submission to more primitive decomposition paths.
-- For quads, quad strips, fans, and display-list replay, keep unique vertices
-  and emit indices where the native index path is profitable.
+- Extend indexed submission to display-list replay and polygon decomposition
+  paths where the native index path is profitable.
 - Preserve current array path as fallback.
 - Benchmark NeHe cubes and repeated textured quads.
 

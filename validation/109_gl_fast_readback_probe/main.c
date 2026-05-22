@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <string.h>
 
-static bool results[11];
+static bool results[13];
 
 static bool consume_error(GLenum expected)
 {
@@ -23,7 +23,7 @@ static void expect_bool(const char *name, bool condition, int slot)
 
 static bool all_passed(void)
 {
-    for (int i = 0; i < 11; ++i) {
+    for (int i = 0; i < 13; ++i) {
         if (!results[i]) {
             return false;
         }
@@ -86,6 +86,24 @@ static void run_probe(void)
         { 1.0f, 1.0f, 0.0f }
     };
     static const GLubyte indexed_elements[6] = { 0, 1, 2, 0, 2, 3 };
+    static const GLfloat indexed_grid_vertices[6][3] = {
+        { -0.75f, -0.40f, 0.0f },
+        { 0.00f, -0.40f, 0.0f },
+        { 0.75f, -0.40f, 0.0f },
+        { -0.75f, 0.40f, 0.0f },
+        { 0.00f, 0.40f, 0.0f },
+        { 0.75f, 0.40f, 0.0f }
+    };
+    static const GLfloat indexed_grid_colors[6][3] = {
+        { 1.0f, 0.0f, 0.0f },
+        { 0.0f, 1.0f, 0.0f },
+        { 0.0f, 0.0f, 1.0f },
+        { 1.0f, 1.0f, 0.0f },
+        { 0.0f, 1.0f, 1.0f },
+        { 1.0f, 0.0f, 1.0f }
+    };
+    static const GLubyte indexed_quads[8] = { 0, 1, 4, 3, 1, 2, 5, 4 };
+    static const GLubyte indexed_strip[6] = { 0, 1, 2, 1, 2, 3 };
 
     nxglGetPerfCounters(&counters);
     expect_bool("fast init skips shadow alloc",
@@ -147,24 +165,62 @@ static void run_probe(void)
                 consume_error(GL_NO_ERROR),
                 3);
 
+    nxglResetPerfCounters();
+    clear_rgb(0.0f, 0.0f, 0.0f);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, indexed_grid_vertices);
+    glColorPointer(3, GL_FLOAT, 0, indexed_grid_colors);
+    glDrawElements(GL_QUADS, 8, GL_UNSIGNED_BYTE, indexed_quads);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    nxglSwapBuffers("NXGL fast readback", "fast indexed quads");
+    nxglGetPerfCounters(&counters);
+    expect_bool("fast indexed quads reuse vertices",
+                counters.backend_batches == 1 &&
+                counters.backend_vertices == 6 &&
+                counters.shadow_buffer_allocations == 0 &&
+                counters.shadow_primitives == 0 &&
+                consume_error(GL_NO_ERROR),
+                4);
+
+    nxglResetPerfCounters();
+    clear_rgb(0.0f, 0.0f, 0.0f);
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_COLOR_ARRAY);
+    glVertexPointer(3, GL_FLOAT, 0, indexed_vertices);
+    glColorPointer(3, GL_FLOAT, 0, indexed_colors);
+    glDrawElements(GL_TRIANGLE_STRIP, 6, GL_UNSIGNED_BYTE, indexed_strip);
+    glDisableClientState(GL_COLOR_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
+    nxglSwapBuffers("NXGL fast readback", "fast indexed strip");
+    nxglGetPerfCounters(&counters);
+    expect_bool("fast indexed strip reuse vertices",
+                counters.backend_batches == 1 &&
+                counters.backend_vertices == 4 &&
+                counters.shadow_buffer_allocations == 0 &&
+                counters.shadow_primitives == 0 &&
+                consume_error(GL_NO_ERROR),
+                5);
+
     glReadPixels(320, 240, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-    expect_bool("fast readpixels rejected", consume_error(GL_INVALID_OPERATION), 4);
+    expect_bool("fast readpixels rejected", consume_error(GL_INVALID_OPERATION), 6);
 
     glRasterPos2f(0.0f, 0.0f);
     glDrawPixels(1, 1, GL_RGBA, GL_UNSIGNED_BYTE, draw_pixel);
-    expect_bool("fast drawpixels rejected", consume_error(GL_INVALID_OPERATION), 5);
+    expect_bool("fast drawpixels rejected", consume_error(GL_INVALID_OPERATION), 7);
 
     glRasterPos2f(0.0f, 0.0f);
     glCopyPixels(320, 240, 1, 1, GL_COLOR);
-    expect_bool("fast copypixels rejected", consume_error(GL_INVALID_OPERATION), 6);
+    expect_bool("fast copypixels rejected", consume_error(GL_INVALID_OPERATION), 8);
 
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 320, 240, 1, 1, 0);
-    expect_bool("fast copytex rejected", consume_error(GL_INVALID_OPERATION), 7);
+    expect_bool("fast copytex rejected", consume_error(GL_INVALID_OPERATION), 9);
 
     glClear(GL_ACCUM_BUFFER_BIT);
-    expect_bool("fast accum clear rejected", consume_error(GL_INVALID_OPERATION), 8);
+    expect_bool("fast accum clear rejected", consume_error(GL_INVALID_OPERATION), 10);
 
     nxglSetReadbackEnabled(GL_TRUE);
     clear_rgb(0.25f, 0.5f, 0.75f);
@@ -174,7 +230,7 @@ static void run_probe(void)
          counters.shadow_buffer_allocation_bytes == expected_shadow_bytes() &&
          pixel[0] > 40 && pixel[1] > 90 && pixel[2] > 140 &&
          consume_error(GL_NO_ERROR);
-    expect_bool("readback enable allocates shadows", ok, 9);
+    expect_bool("readback enable allocates shadows", ok, 11);
 
     nxglSetReadbackEnabled(GL_FALSE);
     nxglSetReadbackEnabled(GL_TRUE);
@@ -184,7 +240,7 @@ static void run_probe(void)
          counters.shadow_buffer_allocations == 6 &&
          counters.shadow_buffer_allocation_bytes == expected_shadow_bytes() * 2u &&
          consume_error(GL_NO_ERROR);
-    expect_bool("readback toggle frees reallocates", ok, 10);
+    expect_bool("readback toggle frees reallocates", ok, 12);
 }
 
 int main(void)
@@ -207,8 +263,8 @@ int main(void)
                   all_passed() ? 0.05f : 0.45f,
                   all_passed() ? 0.45f : 0.08f,
                   all_passed() ? 0.9f : 0.08f);
-        for (int i = 0; i < 11; ++i) {
-            draw_result_bar(-2.75f + (float)i * 0.50f, results[i]);
+        for (int i = 0; i < 13; ++i) {
+            draw_result_bar(-2.52f + (float)i * 0.42f, results[i]);
         }
 
         nxglSwapBuffers("NXGL fast readback", all_passed() ? "all checks passed" : "fast readback check failed");

@@ -820,14 +820,14 @@ static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t p
     }
 }
 
-static void draw_indexed_triangles_range(unsigned int start_dword, unsigned int dword_count)
+static void draw_indexed_range(unsigned int start_dword, unsigned int dword_count, uint32_t primitive_op)
 {
     const unsigned int max_dwords_per_draw = 120;
 
     while (dword_count > 0) {
         unsigned int chunk = dword_count > max_dwords_per_draw ? max_dwords_per_draw : dword_count;
         uint32_t *p = pb_begin();
-        p = pb_push1(p, NV097_SET_BEGIN_END, NV097_SET_BEGIN_END_OP_TRIANGLES);
+        p = pb_push1(p, NV097_SET_BEGIN_END, primitive_op);
         pb_push(p++, 0x40000000 | NV20_TCL_PRIMITIVE_3D_INDEX_DATA, chunk);
         memcpy(p, &index_buffer[start_dword], chunk * sizeof(uint32_t));
         p += chunk;
@@ -1265,7 +1265,8 @@ void nxgl_backend_push_primitive(NxglBackendPrimitive primitive, const NxglBacke
     }
 }
 
-void nxgl_backend_push_indexed_triangles(const NxglBackendVertex *vertices,
+bool nxgl_backend_push_indexed_primitive(NxglBackendPrimitive primitive,
+                                         const NxglBackendVertex *vertices,
                                          unsigned int unique_vertex_count,
                                          const uint16_t *indices,
                                          unsigned int index_count)
@@ -1273,19 +1274,20 @@ void nxgl_backend_push_indexed_triangles(const NxglBackendVertex *vertices,
     NxglBackendBatch *batch;
     unsigned int base_vertex;
     unsigned int dword_count;
+    uint32_t primitive_op = primitive_op_from_backend(primitive);
 
     if (vertices == NULL || indices == NULL || unique_vertex_count == 0 || index_count < 3) {
-        return;
+        return false;
     }
     if (unique_vertex_count > 65535u || vertex_count + unique_vertex_count > NXGL_BACKEND_MAX_VERTICES) {
-        return;
+        return false;
     }
     dword_count = (index_count + 1u) / 2u;
     if (index_dword_count + dword_count > NXGL_BACKEND_MAX_INDEX_DWORDS) {
-        return;
+        return false;
     }
-    if (!ensure_batch(NV097_SET_BEGIN_END_OP_TRIANGLES, false)) {
-        return;
+    if (!ensure_batch(primitive_op, false)) {
+        return false;
     }
 
     batch = &batches[batch_count - 1];
@@ -1305,6 +1307,7 @@ void nxgl_backend_push_indexed_triangles(const NxglBackendVertex *vertices,
                                                             (uint16_t)(base_vertex + second));
     }
     scene_dirty = true;
+    return true;
 }
 
 int nxgl_backend_texture_create_rgba(NxglBackendTexture *texture, uint16_t width, uint16_t height, const uint8_t *rgba)
@@ -1570,7 +1573,7 @@ void nxgl_backend_flush(void)
         pb_end(p);
 
         if (batch->indexed) {
-            draw_indexed_triangles_range(batch->index_start, batch->index_dwords);
+            draw_indexed_range(batch->index_start, batch->index_dwords, batch->primitive_op);
         } else {
             draw_arrays_range(batch->start, batch->count, batch->primitive_op);
         }

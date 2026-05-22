@@ -107,7 +107,8 @@ void nxgl_backend_set_camera(float x, float y, float z, float rx, float ry, floa
 void nxgl_backend_push_triangle(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c);
 void nxgl_backend_push_quad(NxglBackendVertex a, NxglBackendVertex b, NxglBackendVertex c, NxglBackendVertex d);
 void nxgl_backend_push_primitive(NxglBackendPrimitive primitive, const NxglBackendVertex *vertices, unsigned int count);
-void nxgl_backend_push_indexed_triangles(const NxglBackendVertex *vertices,
+bool nxgl_backend_push_indexed_primitive(NxglBackendPrimitive primitive,
+                                         const NxglBackendVertex *vertices,
                                          unsigned int unique_vertex_count,
                                          const uint16_t *indices,
                                          unsigned int index_count);
