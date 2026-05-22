@@ -54,9 +54,10 @@ They are intentionally coarse: frame swaps, clears, immediate/array/list draw
 entry points, backend primitive pushes, CPU array expansion,
 position/normal transform work, lighting/fog evaluations, clipping work,
 backend pbkit command-block starts, shader/render-state and texture-stage cache
-behavior, shadow/readback buffer allocation/free activity, shadow fragments,
-pixel-transfer calls, and texture uploads. Use `nxglResetPerfCounters()` and
-`nxglGetPerfCounters()` around a workload to compare optimization passes.
+behavior, backend flush/finish timing, shadow/readback buffer allocation/free
+activity, shadow fragments, pixel-transfer calls, and texture uploads. Use
+`nxglResetPerfCounters()` and `nxglGetPerfCounters()` around a workload to
+compare optimization passes.
 
 Render-only applications should prefer `nxglInitFast()` or
 `nxglSetDefaultReadbackEnabled(GL_FALSE)` before `nxglInit()`. That skips

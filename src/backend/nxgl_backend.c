@@ -165,6 +165,16 @@ static uint32_t *backend_pb_begin(void)
     return pb_begin();
 }
 
+static uint32_t backend_now_ms(void)
+{
+    return (uint32_t)GetTickCount();
+}
+
+static uint32_t backend_elapsed_ms(uint32_t start_ms)
+{
+    return backend_now_ms() - start_ms;
+}
+
 static void invalidate_backend_state_cache(void)
 {
     shader_cache.valid = false;
@@ -1503,7 +1513,11 @@ void nxgl_backend_set_texture_env(NxglBackendTextureEnvMode mode, NxglBackendCol
 
 void nxgl_backend_flush(void)
 {
+    uint32_t start_ms = backend_now_ms();
+
+    ++backend_perf_counters.flush_calls;
     if (!scene_dirty || vertex_count == 0 || batch_count == 0) {
+        backend_perf_counters.flush_ms += backend_elapsed_ms(start_ms);
         return;
     }
 
@@ -1593,6 +1607,7 @@ void nxgl_backend_flush(void)
     index_dword_count = 0;
     batch_count = 0;
     scene_dirty = false;
+    backend_perf_counters.flush_ms += backend_elapsed_ms(start_ms);
 }
 
 int nxgl_backend_back_buffer_width(void)
@@ -1620,6 +1635,8 @@ void nxgl_backend_get_perf_counters(NxglBackendPerfCounters *counters)
 
 void nxgl_backend_finish(const char *title, const char *detail)
 {
+    uint32_t start_ms = backend_now_ms();
+
 #ifdef NXGL_PERF_OVERLAY
     static DWORD perf_last_tick;
     static DWORD perf_sample_tick;
@@ -1632,6 +1649,7 @@ void nxgl_backend_finish(const char *title, const char *detail)
     static unsigned int perf_display_fps_x10;
 #endif
 
+    ++backend_perf_counters.finish_calls;
     nxgl_backend_flush();
 
     if (title != NULL) {
@@ -1697,4 +1715,5 @@ void nxgl_backend_finish(const char *title, const char *detail)
         }
     }
 #endif
+    backend_perf_counters.finish_ms += backend_elapsed_ms(start_ms);
 }

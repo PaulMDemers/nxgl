@@ -88,6 +88,10 @@ typedef struct NxglBackendPerfCounters {
     uint32_t texture_stage_disables;
     uint32_t texture_stage_disable_hits;
     uint32_t command_blocks;
+    uint32_t flush_calls;
+    uint32_t flush_ms;
+    uint32_t finish_calls;
+    uint32_t finish_ms;
 } NxglBackendPerfCounters;
 
 int nxgl_backend_init(void);

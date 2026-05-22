@@ -83,8 +83,9 @@ nxglGetPerfCounters(&counters);
 The counters distinguish backend primitive pushes, CPU array expansion,
 position/normal transform work, lighting/fog evaluations, clipping work,
 backend pbkit command-block starts, shader/render-state and texture-stage cache
-behavior, shadow/readback buffer allocation/free activity, shadow fragments,
-pixel-transfer calls, texture uploads, and frame-level activity.
+behavior, backend flush/finish timing, shadow/readback buffer allocation/free
+activity, shadow fragments, pixel-transfer calls, texture uploads, and
+frame-level activity.
 
 ## Documentation
 
