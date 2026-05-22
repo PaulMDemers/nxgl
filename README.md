@@ -85,7 +85,9 @@ position/normal transform work, lighting/fog evaluations, clipping work,
 backend pbkit command-block starts, shader/render-state and texture-stage cache
 behavior, backend flush/finish timing, shadow/readback buffer allocation/free
 activity, shadow fragments, pixel-transfer calls, texture uploads, and
-frame-level activity.
+frame-level activity. `validation/110_gl_perf_counter_probe` runs a small set
+of representative render and readback workloads and prints these counters in a
+stable `PERF ...` format.
 
 ## Documentation
 

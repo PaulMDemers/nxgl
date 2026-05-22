@@ -60,6 +60,7 @@ single probe with:
 ```sh
 make -C validation/autorun_suite
 make -C validation/48_gl_cubemap_render_probe
+make -C validation/110_gl_perf_counter_probe
 ```
 
 The autorun suite is also available from the root:
