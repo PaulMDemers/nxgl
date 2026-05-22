@@ -427,6 +427,7 @@ static NxglBackendColor lit_color_with_material(NxglBackendColor base_color, Nxg
     if (!lighting_enabled) {
         return base_color;
     }
+    perf_lighting_vertex();
 
     if (normalize_enabled || rescale_normal_enabled) {
         normal = normalize_vec3(normal);
@@ -543,6 +544,7 @@ static NxglBackendColor apply_fog(NxglBackendColor color, NxglBackendVec3 pos)
     if (!fog_enabled) {
         return color;
     }
+    perf_fog_vertex();
 
     factor = fog_factor(pos.z);
     out.r = color.r * factor + fog_color.r * (1.0f - factor);
@@ -778,6 +780,7 @@ static bool primitive_rejected_by_clip_planes(const NxglBackendVertex *vertices,
     if (vertices == NULL || count <= 0) {
         return true;
     }
+    perf_clip_test((uint32_t)count);
     for (int plane = 0; plane < NXGL_MAX_CLIP_PLANES; ++plane) {
         bool all_outside = true;
         const GLdouble *p = clip_planes[plane].equation;
@@ -1026,6 +1029,7 @@ static NxglBackendVec3 transform_normal_to_eye(NxglBackendVec3 normal)
 {
     NxglBackendVec3 out;
 
+    perf_normal_transform();
     if (!modelview_inverse_cache_valid) {
         modelview_inverse_cache_invertible = invert_matrix(modelview_inverse_cache, modelview);
         modelview_inverse_cache_valid = true;
@@ -1049,6 +1053,7 @@ static void init_vertex_position(NxglBackendVertex *out, GLfloat x, GLfloat y, G
     GLfloat eye[4];
     GLfloat clip[4];
 
+    perf_position_transform();
     if (w == 0.0f) {
         w = 1.0f;
     }
@@ -1096,6 +1101,7 @@ static NxglBackendVertex read_array_vertex(GLint index)
     int component_size;
     GLsizei stride;
 
+    perf_array_vertex();
     init_vertex_position(&out, 0.0f, 0.0f, 0.0f, 1.0f);
     out.color = current_color;
     out.u = current_u[0];
@@ -1508,6 +1514,7 @@ static bool clip_polygon_to_feedback_volume(const NxglBackendVertex *vertices, i
         *output_count = 0;
         return false;
     }
+    perf_clipped_primitive();
 
     memcpy(scratch_a, vertices, (size_t)count * sizeof(NxglBackendVertex));
     int fixed_plane_count = projected_path_active() ? 6 : 5;

@@ -600,6 +600,14 @@ typedef struct NxglPerfCounters {
     uint32_t backend_texture_stage_cache_hits;
     uint32_t backend_texture_stage_disables;
     uint32_t backend_texture_stage_disable_hits;
+    uint32_t cpu_array_vertices;
+    uint32_t cpu_position_transforms;
+    uint32_t cpu_normal_transforms;
+    uint32_t cpu_lighting_vertices;
+    uint32_t cpu_fog_vertices;
+    uint32_t cpu_clip_tests;
+    uint32_t cpu_clip_vertices;
+    uint32_t cpu_clipped_primitives;
 } NxglPerfCounters;
 
 void nxglResetPerfCounters(void);

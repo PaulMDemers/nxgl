@@ -617,6 +617,42 @@ static void perf_backend_primitive_vertices(uint32_t vertices)
     perf_counters.backend_vertices += vertices;
 }
 
+static void perf_array_vertex(void)
+{
+    ++perf_counters.cpu_array_vertices;
+}
+
+static void perf_position_transform(void)
+{
+    ++perf_counters.cpu_position_transforms;
+}
+
+static void perf_normal_transform(void)
+{
+    ++perf_counters.cpu_normal_transforms;
+}
+
+static void perf_lighting_vertex(void)
+{
+    ++perf_counters.cpu_lighting_vertices;
+}
+
+static void perf_fog_vertex(void)
+{
+    ++perf_counters.cpu_fog_vertices;
+}
+
+static void perf_clip_test(uint32_t vertices)
+{
+    ++perf_counters.cpu_clip_tests;
+    perf_counters.cpu_clip_vertices += vertices;
+}
+
+static void perf_clipped_primitive(void)
+{
+    ++perf_counters.cpu_clipped_primitives;
+}
+
 static int source_components(GLenum format);
 static int texgen_coord_index(GLenum coord);
 static GLenum texgen_cap_from_index(int index);

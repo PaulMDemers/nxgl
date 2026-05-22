@@ -12,23 +12,15 @@
 
 ## Pass 0: Instrument Before Changing Behavior
 
-Status: initial coarse counters are implemented through `NxglPerfCounters`.
-Backend shader/render-state and texture-stage cache upload/hit counters are
-also exposed.
+Status: coarse counters are implemented through `NxglPerfCounters`. Backend
+shader/render-state and texture-stage cache upload/hit counters are exposed,
+and the GL state layer now reports CPU array expansion, position/normal
+transform work, lighting/fog evaluations, and clipping work.
 
 Add optional counters behind `NXGL_PERF_OVERLAY` or a new lightweight profiling
 flag:
 
-- GL primitives submitted
-- backend vertices emitted
-- batches emitted
-- shader program uploads and cache hits
-- texture-stage uploads/disables and cache hits
 - pbkit command blocks started
-- CPU shadow buffer allocations/frees
-- CPU shadow primitives touched
-- shadow pixels touched
-- readback/pixel-transfer API calls
 - time spent in GL assembly, shadow update, backend flush, and frame finish
 
 Expected payoff: lets us prove whether later passes improve real workloads and
