@@ -159,6 +159,12 @@ static NxglBackendRenderStateCache render_state_cache;
 static NxglBackendTextureStageCache texture_stage_cache[4];
 static NxglBackendPerfCounters backend_perf_counters;
 
+static uint32_t *backend_pb_begin(void)
+{
+    ++backend_perf_counters.command_blocks;
+    return pb_begin();
+}
+
 static void invalidate_backend_state_cache(void)
 {
     shader_cache.valid = false;
@@ -276,7 +282,7 @@ static void load_color_shader(void)
 
     ++backend_perf_counters.shader_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
                  MASK(NV097_SET_TRANSFORM_EXECUTION_MODE_MODE, NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_PROGRAM) |
@@ -284,19 +290,19 @@ static void load_color_shader(void)
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_CXT_WRITE_EN, 0);
     pb_end(p);
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_LOAD, 0);
     pb_end(p);
 
     for (unsigned int i = 0; i < sizeof(vs_program) / 16; ++i) {
-        p = pb_begin();
+        p = backend_pb_begin();
         pb_push(p++, NV097_SET_TRANSFORM_PROGRAM, 4);
         memcpy(p, &vs_program[i * 4], 4 * 4);
         p += 4;
         pb_end(p);
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_SHADER_OTHER_STAGE_INPUT, 0);
     p = pb_push1(p, NV097_SET_SHADER_STAGE_PROGRAM,
                  MASK(NV097_SET_SHADER_STAGE_PROGRAM_STAGE0, NV097_SET_SHADER_STAGE_PROGRAM_STAGE0_PROGRAM_NONE) |
@@ -336,7 +342,7 @@ static void load_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor
 
     ++backend_perf_counters.shader_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
                  MASK(NV097_SET_TRANSFORM_EXECUTION_MODE_MODE, NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_PROGRAM) |
@@ -344,19 +350,19 @@ static void load_texture_shader(NxglBackendTextureEnvMode mode, NxglBackendColor
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_CXT_WRITE_EN, 0);
     pb_end(p);
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_LOAD, 0);
     pb_end(p);
 
     for (unsigned int i = 0; i < sizeof(vs_program) / 16; ++i) {
-        p = pb_begin();
+        p = backend_pb_begin();
         pb_push(p++, NV097_SET_TRANSFORM_PROGRAM, 4);
         memcpy(p, &vs_program[i * 4], 4 * 4);
         p += 4;
         pb_end(p);
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     if (mode == NXGL_BACKEND_TEXENV_REPLACE) {
         #include "nxgl_tex_replace_ps.inl"
     } else if (mode == NXGL_BACKEND_TEXENV_DECAL) {
@@ -392,7 +398,7 @@ static void load_multitexture_shader(void)
 
     ++backend_perf_counters.shader_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
                  MASK(NV097_SET_TRANSFORM_EXECUTION_MODE_MODE, NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_PROGRAM) |
@@ -400,19 +406,19 @@ static void load_multitexture_shader(void)
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_CXT_WRITE_EN, 0);
     pb_end(p);
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_LOAD, 0);
     pb_end(p);
 
     for (unsigned int i = 0; i < sizeof(vs_program) / 16; ++i) {
-        p = pb_begin();
+        p = backend_pb_begin();
         pb_push(p++, NV097_SET_TRANSFORM_PROGRAM, 4);
         memcpy(p, &vs_program[i * 4], 4 * 4);
         p += 4;
         pb_end(p);
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     #include "nxgl_tex2_modulate_ps.inl"
     pb_end(p);
 }
@@ -426,7 +432,7 @@ static void load_cube_texture_shader(void)
 
     ++backend_perf_counters.shader_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
                  MASK(NV097_SET_TRANSFORM_EXECUTION_MODE_MODE, NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_PROGRAM) |
@@ -434,19 +440,19 @@ static void load_cube_texture_shader(void)
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_CXT_WRITE_EN, 0);
     pb_end(p);
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_LOAD, 0);
     pb_end(p);
 
     for (unsigned int i = 0; i < sizeof(vs_program) / 16; ++i) {
-        p = pb_begin();
+        p = backend_pb_begin();
         pb_push(p++, NV097_SET_TRANSFORM_PROGRAM, 4);
         memcpy(p, &vs_program[i * 4], 4 * 4);
         p += 4;
         pb_end(p);
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     #include "nxgl_cube_ps.inl"
     pb_end(p);
 }
@@ -460,7 +466,7 @@ static void load_texture3d_shader(void)
 
     ++backend_perf_counters.shader_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_START, 0);
     p = pb_push1(p, NV097_SET_TRANSFORM_EXECUTION_MODE,
                  MASK(NV097_SET_TRANSFORM_EXECUTION_MODE_MODE, NV097_SET_TRANSFORM_EXECUTION_MODE_MODE_PROGRAM) |
@@ -468,19 +474,19 @@ static void load_texture3d_shader(void)
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_CXT_WRITE_EN, 0);
     pb_end(p);
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_TRANSFORM_PROGRAM_LOAD, 0);
     pb_end(p);
 
     for (unsigned int i = 0; i < sizeof(vs_program) / 16; ++i) {
-        p = pb_begin();
+        p = backend_pb_begin();
         pb_push(p++, NV097_SET_TRANSFORM_PROGRAM, 4);
         memcpy(p, &vs_program[i * 4], 4 * 4);
         p += 4;
         pb_end(p);
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     #include "nxgl_tex3d_ps.inl"
     pb_end(p);
 }
@@ -593,7 +599,7 @@ static void setup_render_state(bool blend, uint32_t sfactor, uint32_t dfactor,
 
     ++backend_perf_counters.render_state_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_DEPTH_TEST_ENABLE, depth_test ? 1 : 0);
     p = pb_push1(p, NV097_SET_DEPTH_FUNC, NV097_SET_DEPTH_FUNC_V_LEQUAL);
     p = pb_push1(p, NV097_SET_DEPTH_MASK, depth_write ? 1 : 0);
@@ -696,7 +702,7 @@ static void setup_texture_stage_unit(unsigned int unit, NxglBackendTexture *text
 
     ++backend_perf_counters.texture_stage_uploads;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push2(p, NV20_TCL_PRIMITIVE_3D_TX_OFFSET(unit), offset, format);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_DEPTH_UNIT(unit), depth);
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_NPOT_PITCH(unit), pitch);
@@ -720,7 +726,7 @@ static void disable_texture_stage_unit(unsigned int unit)
 
     ++backend_perf_counters.texture_stage_disables;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     p = pb_push1(p, NV20_TCL_PRIMITIVE_3D_TX_ENABLE(unit), 0x0003ffc0);
     pb_end(p);
 
@@ -758,7 +764,7 @@ static void disable_texture_stages(void)
 
 static void set_attrib_pointer(unsigned int index, unsigned int format, unsigned int size, unsigned int stride, const void *data)
 {
-    uint32_t *p = pb_begin();
+    uint32_t *p = backend_pb_begin();
     p = pb_push1(p, NV097_SET_VERTEX_DATA_ARRAY_FORMAT + index * 4,
                  MASK(NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE, format) |
                  MASK(NV097_SET_VERTEX_DATA_ARRAY_FORMAT_SIZE, size) |
@@ -807,7 +813,7 @@ static void draw_arrays_range(unsigned int start, unsigned int count, uint32_t p
             return;
         }
 
-        uint32_t *p = pb_begin();
+        uint32_t *p = backend_pb_begin();
         p = pb_push1(p, NV097_SET_BEGIN_END, primitive_op);
         p = pb_push1(p, 0x40000000 | NV097_DRAW_ARRAYS,
                      MASK(NV097_DRAW_ARRAYS_COUNT, (chunk - 1)) |
@@ -826,7 +832,7 @@ static void draw_indexed_range(unsigned int start_dword, unsigned int dword_coun
 
     while (dword_count > 0) {
         unsigned int chunk = dword_count > max_dwords_per_draw ? max_dwords_per_draw : dword_count;
-        uint32_t *p = pb_begin();
+        uint32_t *p = backend_pb_begin();
         p = pb_push1(p, NV097_SET_BEGIN_END, primitive_op);
         pb_push(p++, 0x40000000 | NV20_TCL_PRIMITIVE_3D_INDEX_DATA, chunk);
         memcpy(p, &index_buffer[start_dword], chunk * sizeof(uint32_t));
@@ -1109,7 +1115,7 @@ void nxgl_backend_clear_color(uint32_t clear_color, bool red, bool green, bool b
         return;
     }
 
-    p = pb_begin();
+    p = backend_pb_begin();
     pb_push(p++, NV20_TCL_PRIMITIVE_3D_CLEAR_VALUE_HORIZ, 2);
     *(p++) = ((x + width - 1) << 16) | x;
     *(p++) = ((y + height - 1) << 16) | y;
@@ -1142,7 +1148,7 @@ void nxgl_backend_clear_depth_stencil(bool depth, float depth_value, bool stenci
     if (depth) trigger |= NV097_CLEAR_SURFACE_Z;
     if (stencil) trigger |= NV097_CLEAR_SURFACE_STENCIL;
 
-    p = pb_begin();
+    p = backend_pb_begin();
     pb_push(p++, NV20_TCL_PRIMITIVE_3D_CLEAR_VALUE_HORIZ, 2);
     *(p++) = ((uint32_t)(x + width - 1) << 16) | ((uint32_t)x & 0xffffu);
     *(p++) = ((uint32_t)(y + height - 1) << 16) | ((uint32_t)y & 0xffffu);
@@ -1504,7 +1510,7 @@ void nxgl_backend_flush(void)
     while (pb_busy()) {
     }
 
-    uint32_t *p = pb_begin();
+    uint32_t *p = backend_pb_begin();
     pb_push(p++, NV097_SET_VERTEX_DATA_ARRAY_FORMAT, 16);
     for (int i = 0; i < 16; ++i) {
         *(p++) = NV097_SET_VERTEX_DATA_ARRAY_FORMAT_TYPE_F;
@@ -1565,7 +1571,7 @@ void nxgl_backend_flush(void)
             use_color_shader();
         }
 
-        p = pb_begin();
+        p = backend_pb_begin();
         p = pb_push1(p, NV097_SET_TRANSFORM_CONSTANT_LOAD, 96);
         pb_push(p++, NV097_SET_TRANSFORM_CONSTANT, 16);
         memcpy(p, mvp, 16 * 4);

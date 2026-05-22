@@ -160,6 +160,7 @@ static void run_probe(void)
     expect_bool("fast indexed elements reuse vertices",
                 counters.backend_batches == 1 &&
                 counters.backend_vertices == 4 &&
+                counters.backend_command_blocks > 0 &&
                 counters.cpu_array_vertices == 4 &&
                 counters.cpu_position_transforms > 0 &&
                 counters.cpu_normal_transforms > 0 &&

@@ -415,6 +415,7 @@ void nxglGetPerfCounters(NxglPerfCounters *counters)
     counters->backend_texture_stage_cache_hits = backend_counters.texture_stage_cache_hits;
     counters->backend_texture_stage_disables = backend_counters.texture_stage_disables;
     counters->backend_texture_stage_disable_hits = backend_counters.texture_stage_disable_hits;
+    counters->backend_command_blocks = backend_counters.command_blocks;
 }
 
 void nxglSwapBuffers(const char *title, const char *detail)

@@ -15,12 +15,12 @@
 Status: coarse counters are implemented through `NxglPerfCounters`. Backend
 shader/render-state and texture-stage cache upload/hit counters are exposed,
 and the GL state layer now reports CPU array expansion, position/normal
-transform work, lighting/fog evaluations, and clipping work.
+transform work, lighting/fog evaluations, and clipping work. Backend pbkit
+command-block starts are also counted.
 
 Add optional counters behind `NXGL_PERF_OVERLAY` or a new lightweight profiling
 flag:
 
-- pbkit command blocks started
 - time spent in GL assembly, shadow update, backend flush, and frame finish
 
 Expected payoff: lets us prove whether later passes improve real workloads and

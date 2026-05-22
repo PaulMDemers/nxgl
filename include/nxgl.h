@@ -608,6 +608,7 @@ typedef struct NxglPerfCounters {
     uint32_t cpu_clip_tests;
     uint32_t cpu_clip_vertices;
     uint32_t cpu_clipped_primitives;
+    uint32_t backend_command_blocks;
 } NxglPerfCounters;
 
 void nxglResetPerfCounters(void);
